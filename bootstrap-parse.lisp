@@ -20,11 +20,7 @@
 	    (progn
 	      (advance-file-position in blocksize)
 	      (format t "~%"))
-	    (with-open-file (out
-			     (make-pathname
-			      :name (format nil "blk~7,'0d" blocknum)
-			      :type "dat"
-			      :defaults (pathname-as-directory output-dir))
+	    (with-open-file (out (make-blockfile-pathname blocknum output-dir)
 			     :direction :output
 			     :element-type '(unsigned-byte 8)
 			     :if-does-not-exist :create
@@ -46,3 +42,9 @@
 (defun copy-bytes (instream outstream count)
   (dotimes (i count)
     (write-byte (read-byte in) out)))
+
+(defun make-blockfile-pathname (blocknum output-dir)
+  (make-pathname
+   :name (format nil "blk~7,'0d" blocknum)
+   :type "dat"
+   :defaults (pathname-as-directory output-dir)))
