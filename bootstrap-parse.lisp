@@ -11,8 +11,8 @@
 		   bootstrap-file
 		   :element-type '(unsigned-byte 8))
     (dotimes (blocknum (+ count start))
-      (let ((network (btclReadUint32 in))
-	    (blocksize (btclReadUint32 in)))
+      (let ((network (read-uint32 in))
+	    (blocksize (read-uint32 in)))
 	(format t "block offset ~d - net 0x~X size ~d"
 		blocknum
 		network blocksize)
@@ -33,7 +33,7 @@
 		(write-byte (read-byte in) out))
 	      (format t " *~%")))))))
 
-(defun btclReadUint32 (instream)
+(defun read-uint32 (instream)
   (let ((uint32 0))
     (setf (ldb (byte 8 0) uint32) (read-byte instream))
     (setf (ldb (byte 8 8) uint32) (read-byte instream))
