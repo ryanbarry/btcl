@@ -5,26 +5,33 @@
 
 (defun parse-bootstrap-file (&key (bootstrap-file *local-bootstrap*)
 			       (output-dir *local-blk-storage*)
-			       (numblocks 1))
+			       (start 0)
+			       (count 1))
   (with-open-file (in
 		   bootstrap-file
 		   :element-type '(unsigned-byte 8))
-    (dotimes (blocknum numblocks)
+    (dotimes (blocknum (+ count start))
       (let ((network (btclReadUint32 in))
 	    (blocksize (btclReadUint32 in)))
-	(format t "~3d of ~d blocks - net 0x~X size ~d~%" (1+ blocknum)
-		numblocks network blocksize)
-	(with-open-file (out
-			 (make-pathname
-			  :name (format nil "blk~7,'0d" blocknum)
-			  :type "dat"
-			  :defaults (pathname-as-directory output-dir))
-			 :direction :output
-			 :element-type '(unsigned-byte 8)
-			 :if-does-not-exist :create
-			 :if-exists :supersede)
-	  (dotimes (i blocksize)
-	    (write-byte (read-byte in) out)))))))
+	(format t "block offset ~d - net 0x~X size ~d"
+		blocknum
+		network blocksize)
+	(if (< blocknum start)
+	    (progn
+	      (advance-file-position in blocksize)
+	      (format t "~%"))
+	    (with-open-file (out
+			     (make-pathname
+			      :name (format nil "blk~7,'0d" blocknum)
+			      :type "dat"
+			      :defaults (pathname-as-directory output-dir))
+			     :direction :output
+			     :element-type '(unsigned-byte 8)
+			     :if-does-not-exist :create
+			     :if-exists :supersede)
+	      (dotimes (i blocksize)
+		(write-byte (read-byte in) out))
+	      (format t " *~%")))))))
 
 (defun btclReadUint32 (instream)
   (let ((uint32 0))
@@ -33,3 +40,6 @@
     (setf (ldb (byte 8 16) uint32) (read-byte instream))
     (setf (ldb (byte 8 24) uint32) (read-byte instream))
     uint32))
+
+(defun advance-file-position (fstream count)
+  (file-position fstream (+ (file-position fstream) count)))
