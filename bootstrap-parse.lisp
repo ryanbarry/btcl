@@ -13,7 +13,7 @@
     (dotimes (blocknum (+ count start))
       (let ((network (read-uint32 in))
 	    (blocksize (read-uint32 in)))
-	(format t "block offset ~d - net 0x~X size ~d"
+	(format t "block offset ~7d - net 0x~X size ~d"
 		blocknum
 		network blocksize)
 	(if (< blocknum start)
@@ -29,8 +29,7 @@
 			     :element-type '(unsigned-byte 8)
 			     :if-does-not-exist :create
 			     :if-exists :supersede)
-	      (dotimes (i blocksize)
-		(write-byte (read-byte in) out))
+	      (copy-bytes in out blocksize)
 	      (format t " *~%")))))))
 
 (defun read-uint32 (instream)
@@ -43,3 +42,7 @@
 
 (defun advance-file-position (fstream count)
   (file-position fstream (+ (file-position fstream) count)))
+
+(defun copy-bytes (instream outstream count)
+  (dotimes (i count)
+    (write-byte (read-byte in) out)))
