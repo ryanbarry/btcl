@@ -28,6 +28,29 @@
 	      (copy-bytes in out blocksize)
 	      (format t " *~%")))))))
 
+(defun read-varint (instream)
+  (let ((varint 0))
+    (setf (ldb (byte 8 0) varint) (read-byte instream))
+    (cond ((< varint #xFD) varint)
+	  ((= varint #xFD) ; 1st byte == 0xFD, then uint16_t
+	   (setf (ldb (byte 8 0) varint) (read-byte instream))
+	   (setf (ldb (byte 8 8) varint) (read-byte instream)))
+	  ((= varint #xFE) ; 1st byte == 0xFE, then uint32_t
+	   (setf (ldb (byte 8 0) varint) (read-byte instream))
+	   (setf (ldb (byte 8 8) varint) (read-byte instream))
+	   (setf (ldb (byte 8 16) varint) (read-byte instream))
+	   (setf (ldb (byte 8 24) varint) (read-byte instream)))
+	  ((= varint #xFF) ; 1st byte == 0xFF, then uint64_t
+	   (setf (ldb (byte 8 0) varint) (read-byte instream))
+	   (setf (ldb (byte 8 8) varint) (read-byte instream))
+	   (setf (ldb (byte 8 16) varint) (read-byte instream))
+	   (setf (ldb (byte 8 24) varint) (read-byte instream))
+	   (setf (ldb (byte 8 32) varint) (read-byte instream))
+	   (setf (ldb (byte 8 40) varint) (read-byte instream))
+	   (setf (ldb (byte 8 48) varint) (read-byte instream))
+	   (setf (ldb (byte 8 56) varint) (read-byte instream)))))
+  varint)
+
 (defun read-uint32 (instream)
   (let ((uint32 0))
     (setf (ldb (byte 8 0) uint32) (read-byte instream))
