@@ -16,4 +16,5 @@
 (defpackage :com-nuclearice-btcl
   (:import-from :com.gigamonkeys.portable-pathnames :pathname-as-directory)
   (:export
-   :parse-bootstrap-file))
+   :parse-bootstrap-file
+   :parse-blockfile))

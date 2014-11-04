@@ -2,9 +2,24 @@
 
 (defparameter *local-blockfile0* #p"/Users/rbarry/projects/btcl/blocks/blk0000000.dat")
 
+(defun parse-blockfile (&key (blockfile-pathname *local-blockfile0*))
+  (let ((blockfile (file->bytevec blockfile-pathname))
+	(blockpointer 0))
+    (format t "v: ~d~%" (read-uint32 blockfile))
+    (incf blockpointer 4)
+    (format t "hash: ~X~%" (subseq blockfile blockpointer))
+    (incf blockpointer 32)
+    (format t "merkle root: ~X~%" (subseq blockfile blockpointer))
+    (incf blockpointer 32)
+    (format t "time: ~d~%" (read-uint32 (subseq blockfile blockpointer)))
+    (incf blockpointer 4)
+    (format t "bits: ~d~%" (read-uint32 (subseq blockfile blockpointer)))
+    (incf blockpointer 4)
+    (format t "nonce: ~d~%" (read-uint32 (subseq blockfile blockpointer)))))
+
 (defun file->bytevec (pathname)
   (with-open-file (finstream pathname :element-type '(unsigned-byte 8))
-    (let* ((filelen (file-length in))
+    (let* ((filelen (file-length finstream))
            (filevec (make-array filelen :element-type '(unsigned-byte 8))))
       (read-sequence filevec finstream)
       filevec)))
@@ -25,7 +40,7 @@
 
 (defun read-uint64 (bytevec)
   (let ((uint64 0))
-    (setf (ldb (byte 8 0) varint) (elt bytevec 0))
+    (setf (ldb (byte 8 0) uint64) (elt bytevec 0))
     (setf (ldb (byte 8 8) uint64) (elt bytevec 1))
     (setf (ldb (byte 8 16) uint64) (elt bytevec 2))
     (setf (ldb (byte 8 24) uint64) (elt bytevec 3))
@@ -44,5 +59,5 @@
 	  ((= varint #xFE) ; 1st byte == 0xFE, then uint32_t
 	   (read-uint32 instream))
 	  ((= varint #xFF) ; 1st byte == 0xFF, then uint64_t
-	   (read-uint64 instream))))
-  varint)
+	   (read-uint64 instream)))
+    varint))
