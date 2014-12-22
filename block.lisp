@@ -33,4 +33,4 @@
     :initarg :vout)
    (lock-time ; uint32
     :initarg :lock-time
-    :initform (get-unix-time))))
+    :initform 0)))
