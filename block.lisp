@@ -1,24 +1,24 @@
 (in-package :com-nuclearice-btcl)
 
-(defparameter +current-block-version+ 2)
+(defparameter +current-block-version+ 2) ; v2 since BIP0034
 
 (defclass block ()
-  ((version
+  ((version ; int32
     :initarg :ver
     :initform +current-block-version+)
-   (hash-prev-block
+   (hash-prev-block ; uint256
     :initarg :hash-prev
     :initform nil)
-   (hash-merkle-root
+   (hash-merkle-root ; uint256
     :initarg :merkle-root
     :initform nil)
-   (time
+   (time ; uint32
     :initarg :time
     :initform (get-unix-time))
-   (bits
+   (bits ; uint32
     :initarg :bits)
-   (nonce
+   (nonce ; uint32
     :initarg :nonce)
-   (vtx
+   (vtx ; vector<transaction>
     :initarg :vtx)))
 
