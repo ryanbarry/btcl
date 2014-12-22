@@ -1,6 +1,7 @@
 (in-package :com-nuclearice-btcl)
 
 (defparameter +current-block-version+ 2) ; v2 since BIP0034
+(defparameter +current-txn-version+ 1)
 
 (defclass block ()
   ((version ; int32
@@ -22,3 +23,14 @@
    (vtx ; vector<transaction>
     :initarg :vtx)))
 
+(defclass transaction ()
+  ((version ; int32
+    :initarg :ver
+    :initform +current-txn-version+)
+   (vin ; vector<txin>
+    :initarg :vin)
+   (vout ; vector<txout>
+    :initarg :vout)
+   (lock-time ; uint32
+    :initarg :lock-time
+    :initform (get-unix-time))))
