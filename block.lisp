@@ -34,3 +34,20 @@
    (lock-time ; uint32
     :initarg :lock-time
     :initform 0)))
+
+(defclass txin ()
+  ((hash ; uint256
+    :initarg :hash)
+   (n ; int32
+    :initarg :n)
+   (script-sig ; cscript
+    :initarg :script-sig)
+   (sequence ; uint32
+    :initarg :seq
+    :initform 4294967296))) ; uint32-max means finalized
+
+(defclass txout ()
+  ((value ; int64
+    :initarg :val)
+   (script-pubkey ; cscript
+    :initarg :script-pubkey)))
