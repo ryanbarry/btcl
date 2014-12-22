@@ -2,6 +2,7 @@
 
 (defparameter +current-block-version+ 2) ; v2 since BIP0034
 (defparameter +current-txn-version+ 1)
+(defparameter +default-dust-min+ 546) ; in satoshis
 
 (defclass block ()
   ((version ; int32
