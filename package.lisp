@@ -1,6 +1,6 @@
 (in-package :cl-user)
 
-(defpackage :com.gigamonkeys.portable-pathnames
+(defpackage #:com.gigamonkeys.portable-pathnames
   (:use :common-lisp)
   (:export
    :list-directory
@@ -13,8 +13,11 @@
    :directory-p
    :file-p))
 
-(defpackage :com-nuclearice-btcl
-  (:import-from :com.gigamonkeys.portable-pathnames :pathname-as-directory)
+(defpackage #:btcl
+  (:import-from #:com.gigamonkeys.portable-pathnames #:pathname-as-directory)
+  (:use #:cl)
+  (:shadow :block)
   (:export
-   :parse-bootstrap-file
-   :parse-blockfile))
+   #:parse-bootstrap-file
+   #:parse-blockfile
+   #:print-block))

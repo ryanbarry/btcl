@@ -1,6 +1,6 @@
 ;;; credit goes to Common Lisp Tips
 ;;; http://lisptips.com/post/11649360174/the-common-lisp-and-unix-epochs
-(in-package :com-nuclearice-btcl)
+(in-package :btcl)
 
 (defvar +unix-epoch-difference+ (encode-universal-time 0 0 0 1 1 1970 0))
 

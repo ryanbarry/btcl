@@ -1,4 +1,4 @@
-(in-package :com-nuclearice-btcl)
+(in-package :btcl)
 
 (defparameter +current-block-version+ 2) ; v2 since BIP0034
 (defparameter +current-txn-version+ 1)
