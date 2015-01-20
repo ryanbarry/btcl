@@ -9,49 +9,68 @@
   (format t "time: ~d~%" (slot-value blk 'time))
   (format t "bits: 0x~X~%" (slot-value blk 'bits))
   (format t "nonce: ~d~%" (slot-value blk 'nonce))
-  ;;(format t "txLockTime: ~d~%" (read-uint32 (subseq blockfile *blockpointer*)))
-  )
+  (loop
+     for tx in (slot-value blk 'vtx)
+     for i = 1 then (incf i)
+     do
+       (format t "~ttxno: ~d~%" 1)
+       (format t "~tv: ~d~%" (slot-value tx 'version))
+       (loop for txin in (slot-value tx 'vin)
+          for i = 1 then (incf i)
+          do (format t "~t~tinput: ~d~%" i)
+            (format t "~t~t~thash: ~X~%" (slot-value txin 'hash))
+            (format t "~t~t~tn: ~d~%" (slot-value txin 'n))
+            (format t "~t~t~tscriptSig: ~X~%" (slot-value txin 'script-sig))
+            (format t "~t~t~tsequence: ~d~%" (slot-value txin 'sequence)))
+       (loop for txout in (slot-value tx 'vout)
+          for i = 1 then (incf i)
+          do (format t "~t~toutput: ~d~%" i)
+            (format t "~t~t~tvalue: ~d~%" (slot-value txout 'value))
+            (format t "~t~t~tscriptPubkey: ~X~%" (slot-value txout 'script-pubkey)))
+       (format t "~ttxLockTime: ~d~%" (slot-value tx 'lock-time))))
 
 (defun parse-blockfile
     (&key (blockfile-pathname
 	   #p"~/Library/Application Support/Bitcoin/blocks/blk00000.dat"))
   (let* ((blockfile (file->bytevec blockfile-pathname))
          (*blockpointer* 0))
-    (format t "network 0x~X and block size ~d"
+    (format t "network 0x~X and block size ~d~%"
             (read-uint32 blockfile)
-            (read-uint32 blockfile))
-    (make-instance 'block
-                   :ver (read-uint32 blockfile)
-                   :hash-prev (subseq blockfile *blockpointer*
-                                      (incf *blockpointer* 32))
-                   :merkle-root (subseq blockfile *blockpointer*
-                                        (incf *blockpointer* 32))
-                   :time (read-uint32 (subseq blockfile *blockpointer*))
-                   :bits (read-uint32 (subseq blockfile *blockpointer*))
-                   :nonce (read-uint32 (subseq blockfile *blockpointer*))
-                   :vtx (vector))
-    ;; (dotimes (txno (read-varint (subseq blockfile *blockpointer*)))
-    ;;   (format t "~ttx no: ~d~%~tv: ~d~%" txno
-    ;;           (read-uint32 (subseq blockfile *blockpointer*)))
-    ;;   (dotimes (inpno (read-varint (subseq blockfile *blockpointer*)))
-    ;;     (format t "~t~tinput no: ~d~%" inpno)
-    ;;     (format t "~t~t~thash: ~X~%"
-    ;;     	(subseq blockfile *blockpointer* (incf *blockpointer* 32)))
-    ;;     (format t "~t~t~tidx: ~d~%"
-    ;;     	(read-uint32 (subseq blockfile *blockpointer*)))
-    ;;     (let ((scriptlen (read-varint (subseq blockfile *blockpointer*))))
-    ;;       (format t "~t~t~tscript: ~X~%"
-    ;;     	  (subseq blockfile *blockpointer* (incf *blockpointer* scriptlen))))
-    ;;     (format t "~t~t~tseq: 0x~X~%"
-    ;;     	(read-uint32 (subseq blockfile *blockpointer*))))
-    ;;   (dotimes (outno (read-varint (subseq blockfile *blockpointer*)))
-    ;;     (format t "~t~toutput no: ~d~%" outno)
-    ;;     (format t "~t~t~tval: ~f~%"
-    ;;     	(/ (read-uint64 (subseq blockfile *blockpointer*)) 100000000))
-    ;;     (let ((scriptlen (read-varint (subseq blockfile *blockpointer*))))
-    ;;       (format t "~t~t~tscript: ~X~%"
-    ;;     	  (subseq blockfile *blockpointer* (incf *blockpointer* scriptlen))))))
-    ))
+            (read-uint32 (subseq blockfile *blockpointer*)))
+    (make-instance
+     'block
+     :ver (read-uint32 (subseq blockfile *blockpointer*))
+     :hash-prev (subseq blockfile *blockpointer* (incf *blockpointer* 32))
+     :merkle-root (subseq blockfile *blockpointer* (incf *blockpointer* 32))
+     :time (read-uint32 (subseq blockfile *blockpointer*))
+     :bits (read-uint32 (subseq blockfile *blockpointer*))
+     :nonce (read-uint32 (subseq blockfile *blockpointer*))
+     :vtx (loop for txno from 1 upto (read-varint (subseq blockfile *blockpointer*))
+             ;;(format t "~ttxno: ~d~%" txno)
+             collect (make-instance 'transaction
+                                    :ver (read-uint32 (subseq blockfile *blockpointer*))
+                                    :vin (loop for inpno from 1 to (read-varint (subseq blockfile *blockpointer*))
+                                             ;;(format t "~t~tinput no: ~d~%" inpno)
+                                             collect (make-instance 'txin
+                                                                   :hash (subseq blockfile *blockpointer* (incf *blockpointer* 32))
+                                                                   :n (read-uint32 (subseq blockfile *blockpointer*))
+                                                                   :script-sig (subseq blockfile
+                                                                                       *blockpointer*
+                                                                                       (incf *blockpointer*
+                                                                                             (read-varint (subseq blockfile *blockpointer*))))
+                                                                   :seq (read-uint32 (subseq blockfile *blockpointer*))))
+                                    :vout (loop for outno from 1 to (read-varint (subseq blockfile *blockpointer*))
+                                             ;;(format t "~t~toutput no: ~d~%" outno)
+                                             collect (make-instance 'txout
+                                                                    :val (/ (read-uint64 (subseq blockfile *blockpointer*)) 100000000)
+                                                                    :script-pubkey (subseq blockfile
+                                                                                           *blockpointer*
+                                                                                           (incf *blockpointer*
+                                                                                                 (read-varint (subseq blockfile *blockpointer*))))))
+                                    :lock-time (read-uint32 (subseq blockfile *blockpointer*)))))))
+
+(defun parse-tx (tx-bytes)
+  )
 
 (defun file->bytevec (pathname)
   (with-open-file (finstream pathname :element-type '(unsigned-byte 8))
