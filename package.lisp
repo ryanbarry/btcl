@@ -21,3 +21,6 @@
    #:parse-bootstrap-file
    #:parse-blockfile
    #:print-block))
+
+(defpackage #:btcl-net
+  (:use #:cl #:btcl))
