@@ -22,5 +22,7 @@
    #:parse-blockfile
    #:print-block))
 
-(defpackage #:btcl-net
+(defpackage #:btcl-digest
   (:use #:cl #:btcl))
+
+(defpackage #:btcl-net
