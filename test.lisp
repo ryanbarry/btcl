@@ -30,11 +30,27 @@
                                   :command "version"
                                   :len (length msg-bytes)
                                   :checksum (dsha256-checksum msg-bytes))))
-  (binary-types:with-binary-file (f "testv.bin"
-                                    :direction :output
-                                    :if-does-not-exist :create
-                                    :if-exists :overwrite)
-    (binary-types:write-binary 'header f msg-header)
-    (binary-types:write-binary 'msg-version f msg))))
-
+  ;; (binary-types:with-binary-file (f "testv.bin"
+  ;;                                   :direction :output
+  ;;                                   :if-does-not-exist :create
+  ;;                                   :if-exists :overwrite)
+  ;;   (binary-types:write-binary 'header f msg-header)
+  ;;   (binary-types:write-binary 'msg-version f msg)))
+  (cl-async:with-event-loop (:catch-app-errors t)
+    (let ((socket (cl-async:tcp-connect "10.0.1.55"
+                                        18333
+                                        (lambda (socket stream)
+                                          (with-open-file (f "test-responses.bin"
+                                                             :direction :output
+                                                             :element-type '(unsigned-byte 8)
+                                                             :if-does-not-exist :create
+                                                             :if-exists :overwrite)
+                                            (loop for b = (read-byte stream nil 'eof)
+                                               until (equalp 'eof b)
+                                               do (write-byte b f))))
+                                        (lambda (event)
+                                          (format t "ev: ~a~%" event))
+                                        :stream t)))
+      (binary-types:write-binary 'header socket msg-header)
+      (binary-types:write-binary 'msg-version socket msg))))
 
