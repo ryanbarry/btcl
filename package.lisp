@@ -20,9 +20,13 @@
   (:export
    #:parse-bootstrap-file
    #:parse-blockfile
-   #:print-block))
+   #:print-block
+   #:get-unix-time))
 
 (defpackage #:btcl-digest
-  (:use #:cl #:btcl))
+  (:use #:cl #:btcl)
+  (:export #:dsha256-checksum))
 
 (defpackage #:btcl-net
+  (:use #:cl #:btcl #:btcl-digest)
+  (:export #:build-ip-addr))

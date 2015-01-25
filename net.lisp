@@ -51,3 +51,16 @@
                  :initarg :height)
    (relay :binary-type binary-types:u8
           :initarg :relay)))
+
+(defun build-ip-addr (&rest addr)
+  "make a 16-byte address in network byte order"
+  (if (or (< (length addr) 4) (some #'> addr '(255 255 255 255)))
+      (error "You must specify the address as 4 numbers, e.g. 192 168 1 10")
+      (let ((result 0))
+        (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
+        (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
+        (setf (ldb (byte 8 96) result) (elt addr 0))
+        (setf (ldb (byte 8 104) result) (elt addr 1))
+        (setf (ldb (byte 8 112) result) (elt addr 2))
+        (setf (ldb (byte 8 120) result) (elt addr 3))
+        result)))
