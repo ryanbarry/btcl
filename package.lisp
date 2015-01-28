@@ -1,5 +1,14 @@
 (in-package :cl-user)
 
+(defpackage #:com.gigamonkeys.macro-utilities
+  (:use :common-lisp)
+  (:export 
+   :with-gensyms
+   :with-gensymed-defuns
+   :once-only
+   :spliceable
+   :ppme))
+
 (defpackage #:com.gigamonkeys.portable-pathnames
   (:use :common-lisp)
   (:export
@@ -12,6 +21,19 @@
    :walk-directory
    :directory-p
    :file-p))
+
+(defpackage #:com.gigamonkeys.binary-data
+  (:nicknames :bindata)
+  (:use :common-lisp :com.gigamonkeys.macro-utilities)
+  (:export :define-binary-class
+           :define-tagged-binary-class
+           :define-binary-type
+           :read-value
+           :write-value
+           :*in-progress-objects*
+           :parent-of-type
+           :current-binary-object
+           :+null+))
 
 (defpackage #:btcl
   (:import-from #:com.gigamonkeys.portable-pathnames #:pathname-as-directory)

@@ -3,49 +3,126 @@
 ;; network byte order
 (defconstant +TESTNET3-MAGIC+ #x0709110b)
 
-(binary-types:define-unsigned u64 8)
-(binary-types:define-signed s64 8)
-(binary-types:define-binary-string header-command 12)
-(binary-types:define-unsigned net-addr-ip-addr 16)
-(binary-types:define-binary-class version-net-addr ()
-  ((services :binary-type 'u64
-             :initarg :sv)
-   (ip-addr :binary-type net-addr-ip-addr
-            :initarg :ip)
-   (port :binary-type binary-types:u16
-         :initarg :port
-         :map-binary-write (lambda (value type-name)
-                             (swap-bytes:swap-bytes-16 value)))))
+(bindata:define-binary-type unsigned-integer-be (bytes)
+  (:reader (in)
+           (loop with value = 0
+              for low-bit downfrom (* 8 (1- bytes)) to 0 by 8 do
+                (setf (ldb (byte 8 low-bit) value) (read-byte in))
+              finally (return value)))
+  (:writer (out value)
+           (loop for low-bit downfrom (* 8 (1- bytes)) to 0 by 8
+              do (write-byte (ldb (byte 8 low-bit) value) out))))
+(bindata:define-binary-type u16be () (unsigned-integer-be :bytes 2))
+(bindata:define-binary-type u32be () (unsigned-integer-be :bytes 4))
+(bindata:define-binary-type u64be () (unsigned-integer-be :bytes 8))
 
-(binary-types:define-binary-class header ()
-  ((magic :binary-type binary-types:u32
-          :initarg :magic)
-   (command :binary-type header-command
-            :initarg :command)
-   (length :binary-type binary-types:u32
-           :initarg :len)
-   (checksum :binary-type binary-types:u32
-             :initarg :checksum)))
+(defun read-unsigned-le (in bytes)
+  (loop with value = 0
+     for low-bit upto (* 8 (1- bytes)) from 0 by 8 do
+       (setf (ldb (byte 8 low-bit) value) (read-byte in))
+     finally (return value)))
+(defun write-unsigned-le (out value bytes)
+  (loop for low-bit upto (* 8 (1- bytes)) from 0 by 8
+     do (write-byte (ldb (byte 8 low-bit) value) out)))
 
-(binary-types:define-binary-class msg-version ()
-  ((version :binary-type binary-types:s32
-            :initarg :ver)
-   (services :binary-type 'u64
-             :initarg :sv)
-   (timestamp :binary-type 's64
-              :initarg :ts)
-   (addr-recv :binary-type version-net-addr
-              :initarg :recv)
-   (addr-from :binary-type version-net-addr
-              :initarg :from)
-   (nonce :binary-type 'u64
-          :initarg :n)
-   (user-agent :binary-type binary-types:char8
-               :initarg :ua)
-   (start-height :binary-type binary-types:s32
-                 :initarg :height)
-   (relay :binary-type binary-types:u8
-          :initarg :relay)))
+(bindata:define-binary-type unsigned-integer-le (bytes)
+  (:reader (in) (read-unsigned-le in bytes))
+  (:writer (out value) (write-unsigned-le out value bytes)))
+(bindata:define-binary-type u8 () (unsigned-integer-le :bytes 1))
+(bindata:define-binary-type u16le () (unsigned-integer-le :bytes 2))
+(bindata:define-binary-type u32le () (unsigned-integer-le :bytes 4))
+(bindata:define-binary-type u64le () (unsigned-integer-le :bytes 8))
+(bindata:define-binary-type u128le () (unsigned-integer-le :bytes 16))
+
+(bindata:define-binary-type signed-integer-le (bytes)
+  (:reader (in)
+           (let ((rawnum (read-unsigned-le in bytes))
+                 (bytes-max (expt 2 bytes)))
+             (if (>= rawnum (/ bytes-max 2))
+                 (- bytes-max rawnum)
+                 rawnum)))
+  (:writer (out value)
+           (if (>= value 0)
+               (write-unsigned-le out value bytes)
+               (error "Writing negative values isn't implemented yet lulz"))))
+
+(bindata:define-binary-type s32le () (signed-integer-le :bytes 4))
+(bindata:define-binary-type s64le () (signed-integer-le :bytes 8))
+
+;; this is CompactSize in BitcoinQT
+(bindata:define-binary-type varint ()
+  (:reader (in)
+           (let ((lowbyte (read-byte in)))
+             (cond ((< lowbyte #xfd) lowbyte)
+                   ((= lowbyte #xfd) (read-unsigned-le in 2))
+                   ((= lowbyte #xfe) (read-unsigned-le in 4))
+                   ((= lowbyte #xff) (read-unsigned-le in 8)))))
+  (:writer (out value)
+           (cond ((< value #xfd) (write-unsigned-le out value 1))
+                 ((<= value #xffff) (progn (write-byte #xfd out)
+                                           (write-unsigned-le out value 2)))
+                 ((<= value #xffffffff) (progn (write-byte #xfe out)
+                                               (write-unsigned-le out value 4)))
+                 (t (progn (write-byte #xff out)
+                           (write-unsigned-le out value 8))))))
+
+(bindata:define-binary-type generic-string (length character-type)
+  (:reader (in)
+           (let ((string (make-string length)))
+             (dotimes (i length)
+               (setf (char string i) (bindata:read-value character-type in)))
+             string))
+  (:writer (out string)
+           (dotimes (i (length string))
+             (bindata:write-value character-type out (char string i)))
+           (if (> length (length string))
+               (dotimes (i (- length (length string)))
+                 (write-byte 0 out)))))
+
+(bindata:define-binary-type iso-8859-1-char ()
+  (:reader (in)
+           (let ((code (read-byte in)))
+             (or (code-char code)
+                 (error "Character code ~d not supported" code))))
+  (:writer (out char)
+           (let ((code (char-code char)))
+             (if (<= 0 code #xff)
+                 (write-byte code out)
+                 (error "Illegal character for iso-8859-1 encoding: character: ~c with code: ~d" char code)))))
+
+(bindata:define-binary-type iso-8859-1-string (length)
+  (generic-string :length length :character-type 'iso-8859-1-char))
+
+(bindata:define-binary-class version-net-addr ()
+  ((services u64le)
+   (ip-addr u128le)
+   (port u16be)))
+
+(bindata:define-binary-class header ()
+  ((magic u32le)
+   (command (iso-8859-1-string :length 12))
+   (len u32le)
+   (checksum u32le)))
+
+(bindata:define-binary-class varstr ()
+  ((len varint)
+   (str (iso-8859-1-string :length len))))
+
+(defun make-varstr (str)
+  (make-instance 'varstr
+                :len (length str)
+                :str str))
+
+(bindata:define-binary-class msg-version ()
+  ((version s32le)
+   (services u64le)
+   (timestamp s64le)
+   (addr-recv version-net-addr)
+   (addr-from version-net-addr)
+   (nonce u64le)
+   (user-agent varstr)
+   (start-height s32le)
+   (relay u8)))
 
 (defun build-ip-addr (&rest addr)
   "make a 16-byte address in network byte order"
