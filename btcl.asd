@@ -1,6 +1,6 @@
 (asdf:defsystem #:btcl
   :serial t
-  :depends-on (#:cl-async #:binary-types #:ironclad #:swap-bytes)
+  :depends-on (#:cl-async #:ironclad)
   :components ((:file "package")
                (:file "macro-utilities")
                (:file "portable-pathnames")

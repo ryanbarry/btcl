@@ -1,41 +1,41 @@
 (in-package :btcl-net)
 
-(let* ((binary-types:*endian* :little-endian)
-       (msg (make-instance 'msg-version
-                           :ver 70002
-                           :sv 1
-                           :ts (get-unix-time)
-                           :recv (make-instance 'version-net-addr
-                                                :sv 1
-                                                :ip (build-ip-addr 10 0 1 55)
+(let* ((msg (make-instance 'msg-version
+                           :version 70002
+                           :services 1
+                           :timestamp (get-unix-time)
+                           :addr-recv (make-instance 'version-net-addr
+                                                :services 1
+                                                :ip-addr (build-ip-addr 10 0 1 55)
                                                 :port 18333)
-                           :from (make-instance 'version-net-addr
-                                                :sv 1
-                                                :ip (build-ip-addr 10 0 1 185)
+                           :addr-from (make-instance 'version-net-addr
+                                                :services 1
+                                                :ip-addr (build-ip-addr 10 0 1 185)
                                                 :port 18333)
-                           :n (random (expt 2 64))
-                           :ua #\null
-                           :height 0
+                           :nonce (random (expt 2 64))
+                           :user-agent (make-varstr "/btcl:0.0.1/")
+                           :start-height 0
                            :relay 1))
-       (msg-bytes (let ((vec (make-array 1 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer 0)))
-                    (binary-types:with-binary-output-to-vector (stream vec :adjustable t)
-                      (binary-types:write-binary 'msg-version stream msg))
-                    (make-array (fill-pointer vec) :element-type '(unsigned-byte 8) :initial-contents vec)))
+       (msg-bytes (let ((vecstream (ironclad:make-octet-output-stream)))
+                    (bindata:write-value 'msg-version vecstream msg)
+                    (ironclad:get-output-stream-octets vecstream)))
        (msg-header (make-instance 'header
                                   :magic +TESTNET3-MAGIC+
                                   :command "version"
                                   :len (length msg-bytes)
                                   :checksum (dsha256-checksum msg-bytes))))
-  (binary-types:with-binary-file (f "testmsg-header.bin"
-                                    :direction :output
-                                    :if-does-not-exist :create
-                                    :if-exists :overwrite)
-    (binary-types:write-binary 'header f msg-header))
-  (binary-types:with-binary-file (f "testmsg-payload.bin"
-                                    :direction :output
-                                    :if-does-not-exist :create
-                                    :if-exists :overwrite)
-    (binary-types:write-binary 'msg-version f msg))
+  (with-open-file (f "testmsg-header.bin"
+                     :element-type '(unsigned-byte 8)
+                     :direction :output
+                     :if-does-not-exist :create
+                     :if-exists :overwrite)
+    (bindata:write-value 'header f msg-header))
+  (with-open-file (f "testmsg-payload.bin"
+                     :element-type '(unsigned-byte 8)
+                     :direction :output
+                     :if-does-not-exist :create
+                     :if-exists :overwrite)
+    (bindata:write-value 'msg-version f msg))
   (cl-async:with-event-loop (:catch-app-errors t)
     (let ((socket (cl-async:tcp-connect "10.0.1.55"
                                         18333
@@ -52,5 +52,5 @@
                                         (lambda (event)
                                           (format t "ev: ~a~%" event))                            
                                         :stream t)))
-      (binary-types:write-binary 'header socket msg-header)
-      (binary-types:write-binary 'msg-version socket msg))))
+      (bindata:write-value 'header socket msg-header)
+      (bindata:write-value 'msg-version socket msg))))
