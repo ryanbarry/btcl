@@ -22,20 +22,20 @@
                       (binary-types:write-binary 'msg-version stream msg))
                     (make-array (fill-pointer vec) :element-type '(unsigned-byte 8) :initial-contents vec)))
        (msg-header (make-instance 'header
-                                  :magic (make-header-magic-number
-                                          :mag0 (elt +TESTNET3-MAGIC+ 0)
-                                          :mag1 (elt +TESTNET3-MAGIC+ 1)
-                                          :mag2 (elt +TESTNET3-MAGIC+ 2)
-                                          :mag3 (elt +TESTNET3-MAGIC+ 3))
+                                  :magic +TESTNET3-MAGIC+
                                   :command "version"
                                   :len (length msg-bytes)
                                   :checksum (dsha256-checksum msg-bytes))))
-  ;; (binary-types:with-binary-file (f "testv.bin"
-  ;;                                   :direction :output
-  ;;                                   :if-does-not-exist :create
-  ;;                                   :if-exists :overwrite)
-  ;;   (binary-types:write-binary 'header f msg-header)
-  ;;   (binary-types:write-binary 'msg-version f msg)))
+  (binary-types:with-binary-file (f "testmsg-header.bin"
+                                    :direction :output
+                                    :if-does-not-exist :create
+                                    :if-exists :overwrite)
+    (binary-types:write-binary 'header f msg-header))
+  (binary-types:with-binary-file (f "testmsg-payload.bin"
+                                    :direction :output
+                                    :if-does-not-exist :create
+                                    :if-exists :overwrite)
+    (binary-types:write-binary 'msg-version f msg))
   (cl-async:with-event-loop (:catch-app-errors t)
     (let ((socket (cl-async:tcp-connect "10.0.1.55"
                                         18333
@@ -44,13 +44,13 @@
                                                              :direction :output
                                                              :element-type '(unsigned-byte 8)
                                                              :if-does-not-exist :create
-                                                             :if-exists :overwrite)
+                                                             :if-exists :append)
                                             (loop for b = (read-byte stream nil 'eof)
+                                               for i = 1 then (incf i)
                                                until (equalp 'eof b)
                                                do (write-byte b f))))
                                         (lambda (event)
-                                          (format t "ev: ~a~%" event))
+                                          (format t "ev: ~a~%" event))                            
                                         :stream t)))
       (binary-types:write-binary 'header socket msg-header)
       (binary-types:write-binary 'msg-version socket msg))))
-

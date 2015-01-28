@@ -1,17 +1,12 @@
 (in-package :btcl-net)
 
 ;; network byte order
-(defconstant +TESTNET3-MAGIC+ '(#x0b #x11 #x09 #x07))
+(defconstant +TESTNET3-MAGIC+ #x0709110b)
 
 (binary-types:define-unsigned u64 8)
 (binary-types:define-signed s64 8)
 (binary-types:define-binary-string header-command 12)
 (binary-types:define-unsigned net-addr-ip-addr 16)
-(binary-types:define-binary-struct header-magic-number ()
-  (mag0 #\null :binary-type binary-types:u8)
-  (mag1 #\null :binary-type binary-types:u8)
-  (mag2 #\null :binary-type binary-types:u8)
-  (mag3 #\null :binary-type binary-types:u8))
 (binary-types:define-binary-class version-net-addr ()
   ((services :binary-type 'u64
              :initarg :sv)
@@ -23,7 +18,7 @@
                              (swap-bytes:swap-bytes-16 value)))))
 
 (binary-types:define-binary-class header ()
-  ((magic :binary-type header-magic-number
+  ((magic :binary-type binary-types:u32
           :initarg :magic)
    (command :binary-type header-command
             :initarg :command)
