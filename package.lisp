@@ -40,11 +40,10 @@
   (:import-from #:com.gigamonkeys.portable-pathnames #:pathname-as-directory)
   (:use #:cl)
   (:shadow :block)
-  (:export
-   #:parse-bootstrap-file
-   #:parse-blockfile
-   #:print-block
-   #:get-unix-time))
+  (:export #:parse-bootstrap-file
+           #:parse-blockfile
+           #:print-block
+           #:get-unix-time))
 
 (defpackage #:btcl-digest
   (:use #:cl #:btcl)
@@ -52,4 +51,5 @@
 
 (defpackage #:btcl-net
   (:use #:cl #:btcl #:btcl-digest)
-  (:export #:build-ip-addr))
+  (:export #:build-ip-addr
+           #:start-peer))

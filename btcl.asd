@@ -9,4 +9,5 @@
                (:file "block")
                (:file "blockfile-read")
                (:file "digest")
-               (:file "net")))
+               (:file "net")
+               (:file "peer")))
