@@ -1,6 +1,6 @@
 (in-package :btcl-net)
 
-;;; draws heavily on github.com/CodeShark/CoinClasses
+(defparameter *debug* t)
 
 (defclass peer-connection ()
   ((host :initarg :host)
@@ -22,13 +22,16 @@
       (when *debug*
         (format t "ev: ~a (~a)~%" (type-of ev) ev)))))
 
-(defun make-event-cb (remote)
+(defun make-read-cb (remote)
   (lambda (socket stream)
-    (let ((msg (bindata:read-value p2p-msg stream)))
+    (declare (ignore socket))
+    (let ((msg (bindata:read-value 'p2p-msg stream)))
       (with-slots (command handshaken) msg
         (cond ((string= command "verack")
+               (format t "got a verack!")
                (setf handshaken (boole boole-ior handshaken #b10)))
               ((string= command "version")
+               (format t "got a version!")
                (setf handshaken (boole boole-ior handshaken #b01))
                (send-verack remote)))))))
 
@@ -53,7 +56,7 @@
                         :relay 1)))
     (multiple-value-bind (cksm len) (checksum-payload msg)
       (setf (slot-value msg 'checksum) cksm)
-      (setf (slot-value msg 'length) len)
+      (setf (slot-value msg 'len) len)
       (bindata:write-value 'msg-version (slot-value remote 'tcp-socket) msg))))
 
 (defun send-verack (remote)
@@ -62,7 +65,7 @@
                             :command "verack")))
     (multiple-value-bind (cksm len) (checksum-payload msg)
       (setf (slot-value msg 'checksum) cksm)
-      (setf (slot-value msg 'length) len)
+      (setf (slot-value msg 'len) len)
       (bindata:write-value 'msg-version (slot-value remote 'tcp-socket) msg))))
 
 (defun start-peer (remote)
@@ -72,10 +75,10 @@
                        (declare (ignore sig))
                        (format t "Closing peer...~%")
                        (as:exit-event-loop)))
-    (setf (slot-value remote tcp-socket)
+    (setf (slot-value remote 'tcp-socket)
           (as:tcp-connect (slot-value remote 'host)
-                                (slot-value remote 'port)
-                                (make-read-cb remote)
-                                (make-event-cb remote)                      
-                                :stream t))
+                          (slot-value remote 'port)
+                          (make-read-cb remote)
+                          :event-cb #'event-cb
+                          :stream t))
     (send-version remote)))
