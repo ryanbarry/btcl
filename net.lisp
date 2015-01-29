@@ -7,7 +7,7 @@
 ;; common structures
 (bindata:define-binary-class version-net-addr ()
   ((services u64le)
-   (ip-addr (raw-bytes :size 16))
+   (ip-addr (u128le :size 16))
    (port u16be)))
 
 (bindata:define-binary-class net-addr ()
@@ -23,7 +23,27 @@
    (checksum u32le))
   (:dispatch (find-msg-class command)))
 
-(bindata:define-binary-class msg-version (p2p-msg)
+(defun find-msg-class (name)
+  (multiple-value-bind (sym status)
+      (find-symbol (concatenate 'string "MSG-" (string-upcase name)))
+    (declare (ignore status))
+    sym))
+
+(defgeneric checksum-payload (msg))
+
+(defmacro define-p2p-msg (name slots)
+  (macut:with-gensyms (objectvar streamvar slotvar bytesvar)
+    `(progn
+       (bindata:define-binary-class ,name (p2p-msg) ,slots)
+       (defmethod checksum-payload ((,objectvar ,name))
+         (let ((,streamvar (ironclad:make-octet-output-stream)))
+           (dolist (,slotvar ',slots)
+             (bindata:write-value (cadr ,slotvar) ,streamvar (slot-value ,objectvar (car ,slotvar))))
+           (let ((,bytesvar (ironclad:get-output-stream-octets ,streamvar)))
+             (values (dsha256-checksum ,bytesvar)
+                     (length ,bytesvar))))))))
+
+(define-p2p-msg msg-version
   ((version s32le)
    (services u64le)
    (timestamp s64le)
@@ -34,29 +54,8 @@
    (start-height s32le)
    (relay u8)))
 
-(bindata:define-binary-class msg-verack (p2p-msg) ())
+(define-p2p-msg msg-verack ())
 
-(bindata:define-binary-class msg-addr (p2p-msg)
+(define-p2p-msg msg-addr
   ((#:count varint)
    (addresses addr-list)))
-
-(defun find-msg-class (name)
-  (multiple-value-bind (sym status)
-      (find-symbol (concatenate 'string "MSG-" (string-upcase name)))
-    (declare (ignore status))
-    sym))
-
-(defun write-value-to-vector (value)
-  (let* ((vecstream (ironclad:make-octet-output-stream)))
-    (bindata:write-value 'msg-version vecstream message)
-    (ironclad:get-output-stream-octets vecstream)))
-
-(defun frame-message (message)
-  (let ((msg-bytes (write-value-to-vector message)))
-    (msg-header (make-instance 'msg
-                               :magic +TESTNET3-MAGIC+
-                               :command "version"
-                               :len (length msg-bytes)
-                               :checksum (dsha256-checksum msg-bytes)))))
-
-

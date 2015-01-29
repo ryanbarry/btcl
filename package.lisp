@@ -1,6 +1,7 @@
 (in-package :cl-user)
 
 (defpackage #:com.gigamonkeys.macro-utilities
+  (:nicknames :macut)
   (:use :common-lisp)
   (:export 
    :with-gensyms
