@@ -72,12 +72,13 @@
 
 (bindata:define-binary-type generic-string (length character-type)
   (:reader (in)
-           (let ((string (make-string length)))
-             (loop for i from 0 upto length
-                with char = (bindata:read-value character-type in)
-                until (char= char #\null)
-                do (setf (char string i) char))
-             string))
+           (let ((string (make-string length))
+                 (end 0))
+             (loop for i from 0 below length
+                for char = (bindata:read-value character-type in)
+                do (setf (char string i) char)
+                unless (char= char #\null) do (incf end) end
+                finally (return (subseq string 0 end)))))
   (:writer (out string)
            (dotimes (i (length string))
              (bindata:write-value character-type out (char string i)))
