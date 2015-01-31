@@ -31,6 +31,8 @@
 
 (defgeneric checksum-payload (msg))
 
+(defgeneric prep-msg (msg))
+
 (defgeneric send-msg (remote msg))
 
 (defmacro define-p2p-msg (name slots)
@@ -45,14 +47,16 @@
            (let ((,bytesvar (ironclad:get-output-stream-octets ,streamvar)))
              (values (dsha256-checksum ,bytesvar)
                      (length ,bytesvar)))))
-       (defmethod send-msg (,remvar (,objectvar ,name))
-         (with-slots (magic command checksum len) ,objectvar
+       (defmethod prep-msg ((,objectvar ,name))
+         (with-slots (command checksum len) ,objectvar
            (multiple-value-bind (,retcksmvar ,retlenvar) (checksum-payload ,objectvar)
-             (setf magic (symbol-value (find-symbol (concatenate 'string "+" (symbol-name (slot-value ,remvar 'net)) "-MAGIC+"))))
              (setf command (string-downcase (symbol-name ',name)))
              (setf checksum ,retcksmvar)
              (setf len ,retlenvar)
-             (bindata:write-value ',name (slot-value ,remvar 'write-stream) ,objectvar)))))))
+             ,objectvar)))
+       (defmethod send-msg (,remvar (,objectvar ,name))
+         (setf (slot-value ,objectvar 'magic) (symbol-value (find-symbol (concatenate 'string "+" (symbol-name (slot-value ,remvar 'net)) "-MAGIC+"))))
+         (bindata:write-value ',name (slot-value ,remvar 'write-stream) ,objectvar)))))
 
 ;;; now come the message types in the p2p protocol
 (define-p2p-msg version
