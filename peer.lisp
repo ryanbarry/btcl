@@ -59,7 +59,7 @@
               (with-slots (version user-agent start-height) msg
                   (format t "~&receive version message: ~s: version ~d, blocks=~d" (slot-value user-agent 'str) version start-height))
               (setf handshaken (boole boole-ior handshaken #b01))
-              (send-verack remote)
+              (send-msg remote (make-instance 'verack))
               (format t "~&handshaken: ~d~%" handshaken))
              ((string= command "inv")
               (format t "got some inventory!")
@@ -85,4 +85,19 @@
       (setf (slot-value remote 'tcp-socket) tcpsock)
       (setf (slot-value remote 'write-stream)
             (make-instance 'as:async-output-stream :socket tcpsock)))
-    (send-version remote)))
+    (send-msg remote (make-instance 'version
+                        :version 70002
+                        :services 1
+                        :timestamp (get-unix-time)
+                        :addr-recv (make-instance 'version-net-addr
+                                                  :services 1
+                                                  :ip-addr (build-ip-addr (slot-value remote 'host))
+                                                  :port (slot-value remote 'port))
+                        :addr-from (make-instance 'version-net-addr
+                                                  :services 1
+                                                  :ip-addr (build-ip-addr "0.0.0.0")
+                                                  :port 0)
+                        :nonce (random (expt 2 64))
+                        :user-agent (make-varstr "/btcl:0.0.2/")
+                        :start-height 0
+                        :relay 1))))

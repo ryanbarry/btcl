@@ -25,14 +25,16 @@
 
 (defun find-msg-class (name)
   (multiple-value-bind (sym status)
-      (find-symbol (concatenate 'string "MSG-" (string-upcase name)))
+      (find-symbol (string-upcase name))
     (declare (ignore status))
     sym))
 
 (defgeneric checksum-payload (msg))
 
+(defgeneric send-msg (remote msg))
+
 (defmacro define-p2p-msg (name slots)
-  (macut:with-gensyms (objectvar streamvar slotvar bytesvar slottypevar)
+  (macut:with-gensyms (objectvar streamvar slotvar bytesvar slottypevar remvar retcksmvar retlenvar)
     `(progn
        (bindata:define-binary-class ,name (p2p-msg) ,slots)
        (defmethod checksum-payload ((,objectvar ,name))
@@ -42,10 +44,18 @@
               (bindata:write-value (if (typep ,slottypevar 'list) (car ,slottypevar) ,slottypevar) ,streamvar (slot-value ,objectvar (car ,slotvar)))))
            (let ((,bytesvar (ironclad:get-output-stream-octets ,streamvar)))
              (values (dsha256-checksum ,bytesvar)
-                     (length ,bytesvar))))))))
+                     (length ,bytesvar)))))
+       (defmethod send-msg (,remvar (,objectvar ,name))
+         (with-slots (magic command checksum len) ,objectvar
+           (multiple-value-bind (,retcksmvar ,retlenvar) (checksum-payload ,objectvar)
+             (setf magic (symbol-value (find-symbol (concatenate 'string "+" (symbol-name (slot-value ,remvar 'net)) "-MAGIC+"))))
+             (setf command (string-downcase (symbol-name ',name)))
+             (setf checksum ,retcksmvar)
+             (setf len ,retlenvar)
+             (bindata:write-value ',name (slot-value ,remvar 'write-stream) ,objectvar)))))))
 
 ;;; now come the message types in the p2p protocol
-(define-p2p-msg msg-version
+(define-p2p-msg version
     ((version u32le)
      (services u64le)
      (timestamp u64le)
@@ -55,51 +65,18 @@
      (user-agent varstr)
      (start-height u32le)
      (relay u8)))
-;; helper
-(defun send-version (remote)
-  (let ((msg (make-instance 'msg-version
-                        :magic +TESTNET3-MAGIC+
-                        :command "version"
-                        :version 70002
-                        :services 1
-                        :timestamp (get-unix-time)
-                        :addr-recv (make-instance 'version-net-addr
-                                                  :services 1
-                                                  :ip-addr (build-ip-addr (slot-value remote 'host))
-                                                  :port (slot-value remote 'port))
-                        :addr-from (make-instance 'version-net-addr
-                                                  :services 1
-                                                  :ip-addr (build-ip-addr "0.0.0.0")
-                                                  :port 0)
-                        :nonce (random (expt 2 64))
-                        :user-agent (make-varstr "/btcl:0.0.2/")
-                        :start-height 0
-                        :relay 1)))
-    (multiple-value-bind (cksm len) (checksum-payload msg)
-      (setf (slot-value msg 'checksum) cksm)
-      (setf (slot-value msg 'len) len)
-      (bindata:write-value 'msg-version (slot-value remote 'write-stream) msg))))
 
-(define-p2p-msg msg-verack ())
-;; another helper TODO: generate these
-(defun send-verack (remote)
-  (let ((msg (make-instance 'msg-verack
-                            :magic +TESTNET3-MAGIC+
-                            :command "verack")))
-    (multiple-value-bind (cksm len) (checksum-payload msg)
-      (setf (slot-value msg 'checksum) cksm)
-      (setf (slot-value msg 'len) len)
-      (bindata:write-value 'msg-verack (slot-value remote 'write-stream) msg))))
+(define-p2p-msg verack ())
 
-(define-p2p-msg msg-inv
+(define-p2p-msg inv
     ((cnt varint)
      (inv-vectors (inv-vector-list :count cnt))))
 
-(define-p2p-msg msg-getdata
+(define-p2p-msg getdata
     ((cnt varint)
      (inv-vectors (inv-vector-list :count cnt))))
 
-(define-p2p-msg msg-addr
+(define-p2p-msg addr
     ((cnt varint)
      (addresses (addr-list :count cnt))))
 
