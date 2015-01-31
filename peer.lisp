@@ -45,11 +45,12 @@
 (defun message-handler (remote)
   (let ((msg (bindata:read-value 'p2p-msg (slot-value remote 'read-stream))))
     (with-slots (command checksum) msg
-      ;; (let ((computed-cksm (checksum-payload msg)))
-      ;;  (if (/= computed-cksm checksum)
-      ;;      (progn
-      ;;        (format t "~&checksum received: ~X~%checksum computed: ~X~%" checksum computed-cksm)
-      ;;        (signal 'invalid-msg :bad-checksum))))
+      (let ((computed-cksm (checksum-payload msg)))
+       (if (/= computed-cksm checksum)
+           (progn
+             (format t "~&checksum received: ~X~%checksum computed: ~X~%" checksum computed-cksm)
+             (signal 'invalid-msg :bad-checksum))
+           (format t "checksum checks out!")))
       (with-slots (handshaken) remote
        (cond ((string= command "verack")
               (format t "~&got a verack!")
