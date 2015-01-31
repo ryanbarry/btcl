@@ -135,6 +135,45 @@
            (dolist (inv-vec inv-vectors)
              (bindata:write-value 'inv-vector out inv-vec))))
 
+(bindata:define-binary-class outpoint ()
+  ((hash (raw-bytes :size 32))
+   (index u32le)))
+
+(bindata:define-binary-class tx-in ()
+  ((previous-output outpoint)
+   (script-len varint)
+   (sig-script (raw-bytes :size script-len))
+   (seq u32le)))
+
+(bindata:define-binary-type tx-in-list (count)
+  (:reader (in)
+           (loop repeat count
+              collect (bindata:read-value 'tx-in in)))
+  (:writer (out tx-in-list)
+           (dolist (tx-in tx-in-list)
+             (bindata:write-value 'tx-in out tx-in))))
+
+(bindata:define-binary-class tx-out ()
+  ((value s64le)
+   (script-len varint)
+   (pub-key-script (raw-bytes :size script-len))))
+
+(bindata:define-binary-type tx-out-list (count)
+  (:reader (in)
+           (loop repeat count
+              collect (bindata:read-value 'tx-out in)))
+  (:writer (out tx-out-list)
+           (dolist (tx-out tx-out-list)
+             (bindata:write-value 'tx-out out tx-out))))
+
+(bindata:define-binary-type txn-list (count)
+  (:reader (in)
+           (loop repeat count
+              collect (bindata:read-value 'txn in)))
+  (:writer (out txn-list)
+           (dolist (txn txn-list)
+             (bindata:write-value 'txn out txn))))
+
 (defun make-varstr (str)
   (make-instance 'varstr
                  :len (length str)

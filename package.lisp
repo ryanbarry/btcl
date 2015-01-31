@@ -39,7 +39,6 @@
 (defpackage #:btcl
   (:import-from #:com.gigamonkeys.portable-pathnames #:pathname-as-directory)
   (:use #:cl)
-  (:shadow :block)
   (:export #:parse-bootstrap-file
            #:parse-blockfile
            #:print-block
@@ -51,5 +50,6 @@
 
 (defpackage #:btcl-net
   (:use #:cl #:btcl #:btcl-digest)
+  (:shadow :block)
   (:export #:build-ip-addr
            #:start-peer))
