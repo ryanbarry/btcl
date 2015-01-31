@@ -71,3 +71,8 @@
   (:shadow :block)
   (:export #:build-ip-addr
            #:start-peer))
+
+(defpackage #:btcl-web
+  (:use :cl :cl-ppcre :cl-async :cl-who :parenscript)
+  (:import-from :babel #:octets-to-string)
+  (:export #:start-server #:publish!))

@@ -45,8 +45,10 @@
              (let ((,slottypevar (cadr ,slotvar)))
               (bindata:write-value (if (typep ,slottypevar 'list) (car ,slottypevar) ,slottypevar) ,streamvar (slot-value ,objectvar (car ,slotvar)))))
            (let ((,bytesvar (ironclad:get-output-stream-octets ,streamvar)))
-             (values (dsha256-checksum ,bytesvar)
-                     (length ,bytesvar)))))
+             (multiple-value-bind (checksum hash) (dsha256-checksum ,bytesvar)
+                 (values checksum
+                         (length ,bytesvar)
+                         hash)))))
        (defmethod prep-msg ((,objectvar ,name))
          (with-slots (command checksum len) ,objectvar
            (multiple-value-bind (,retcksmvar ,retlenvar) (checksum-payload ,objectvar)

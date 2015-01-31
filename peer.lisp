@@ -45,33 +45,55 @@
 (defun message-handler (remote)
   (let ((msg (bindata:read-value 'p2p-msg (slot-value remote 'read-stream))))
     (with-slots (command checksum) msg
-      (let ((computed-cksm (checksum-payload msg)))
-       (if (/= computed-cksm checksum)
-           (progn
-             (format t "~&checksum received: ~X~%checksum computed: ~X~%" checksum computed-cksm)
-             (signal 'invalid-msg :bad-checksum))
-           (format t "checksum checks out!")))
-      (with-slots (handshaken) remote
-       (cond ((string= command "verack")
-              (format t "~&got a verack!")
-              (setf handshaken (boole boole-ior handshaken #b10))
-              (format t "~&handshaken: ~d~%" handshaken))
-             ((string= command "version")
-              (with-slots (version user-agent start-height) msg
-                  (format t "~&receive version message: ~s: version ~d, blocks=~d" (slot-value user-agent 'str) version start-height))
-              (setf handshaken (boole boole-ior handshaken #b01))
-              (send-msg remote (prep-msg (make-instance 'verack)))
-              (format t "~&handshaken: ~d~%" handshaken))
-             ((string= command "inv")
-              (format t "~&got some inventory!")
-              (with-slots (magic command len checksum cnt inv-vectors) msg
-                (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
-                (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
-                        cnt
-                        (slot-value (car inv-vectors) 'obj-type)
-                        (slot-value (car inv-vectors) 'hash))
-                (send-msg remote (prep-msg (make-instance 'getdata :cnt cnt :inv-vectors inv-vectors)))))
-             (t (format t "~&got a new msg: ~s~%" command)))))))
+      (multiple-value-bind (computed-cksm length msg-hash) (checksum-payload msg)
+        (declare (ignore length))
+        (if (/= computed-cksm checksum)
+            (progn
+              (format t "~&checksum received: ~X~%checksum computed: ~X~%" checksum computed-cksm)
+              (signal 'invalid-msg :bad-checksum))
+            (format t "checksum checks out!"))
+        (with-slots (handshaken) remote
+          (cond ((string= command "verack")
+                 (format t "~&got a verack!")
+                 (setf handshaken (boole boole-ior handshaken #b10))
+                 (format t "~&handshaken: ~d~%" handshaken))
+                ((string= command "version")
+                 (with-slots (version user-agent start-height) msg
+                   (format t "~&receive version message: ~s: version ~d, blocks=~d" (slot-value user-agent 'str) version start-height))
+                 (setf handshaken (boole boole-ior handshaken #b01))
+                 (send-msg remote (prep-msg (make-instance 'verack)))
+                 (format t "~&handshaken: ~d~%" handshaken))
+                ((string= command "inv")
+                 (format t "~&got some inventory!")
+                 (with-slots (magic command len checksum cnt inv-vectors) msg
+                   (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
+                   (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
+                           cnt
+                           (slot-value (car inv-vectors) 'obj-type)
+                           (slot-value (car inv-vectors) 'hash))
+                   (send-msg remote (prep-msg (make-instance 'getdata :cnt cnt :inv-vectors inv-vectors)))))
+                ((string= command "tx")
+                 (format t "~&got a tx!")
+                 (let ((uidata '()))
+                   (with-slots (tx-in-count tx-out-count tx-out) msg
+                     (let ((tx-total-value (/ (loop for txo in tx-out
+                                                 sum (slot-value txo 'value)) 100000000)))
+                       (setf uidata (acons "type" "tx" uidata))
+                       (setf uidata (acons "hash" (format nil "~a" (ironclad:byte-array-to-hex-string (reverse msg-hash))) uidata))
+                       (setf uidata (acons "tx-in-count" tx-in-count uidata))
+                       (setf uidata (acons "tx-out-count" tx-out-count uidata))
+                       (setf uidata (acons "total-sent" (format nil "~8,1,,$" tx-total-value) uidata)))
+                     (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata)))))
+                ((string= command "block")
+                 (format t "~&got a block!~%")
+                 (let ((uidata '()))
+                   (with-slots (txn-count timestamp bits) msg
+                     (setf uidata (acons "type" "block" uidata))
+                     (setf uidata (acons "numtx" txn-count uidata))
+                     (setf uidata (acons "timestamp" timestamp uidata))
+                     (setf uidata (acons "diff" (* bits (expt 2 (* 8 (- #x1b 3)))) uidata)))
+                   (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata))))
+                (t (format t "~&got a new msg: ~s~%" command))))))))
 
 (defun start-peer (remote)
   (as:with-event-loop (:catch-app-errors nil)
@@ -85,8 +107,7 @@
                                   (make-read-cb remote)
                                   :event-cb #'event-cb)))
       (setf (slot-value remote 'tcp-socket) tcpsock)
-      (setf (slot-value remote 'write-stream)
-            (make-instance 'as:async-output-stream :socket tcpsock)))
+      (setf (slot-value remote 'write-stream) (make-instance 'as:async-output-stream :socket tcpsock)))
     (send-msg remote (prep-msg (make-instance 'version
                                      :version 70002
                                      :services 1
@@ -102,4 +123,5 @@
                                      :nonce (random (expt 2 64))
                                      :user-agent (make-varstr "/btcl:0.0.2/")
                                      :start-height 0
-                                     :relay 1)))))
+                                     :relay 1)))
+    (btcl-web:start-server)))
