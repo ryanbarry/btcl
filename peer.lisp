@@ -63,13 +63,14 @@
               (send-msg remote (prep-msg (make-instance 'verack)))
               (format t "~&handshaken: ~d~%" handshaken))
              ((string= command "inv")
-              (format t "got some inventory!")
+              (format t "~&got some inventory!")
               (with-slots (magic command len checksum cnt inv-vectors) msg
                 (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
                 (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
                         cnt
                         (slot-value (car inv-vectors) 'obj-type)
-                        (slot-value (car inv-vectors) 'hash))))
+                        (slot-value (car inv-vectors) 'hash))
+                (send-msg remote (prep-msg (make-instance 'getdata :cnt cnt :inv-vectors inv-vectors)))))
              (t (format t "~&got a new msg: ~s~%" command)))))))
 
 (defun start-peer (remote)
