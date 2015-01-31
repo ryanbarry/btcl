@@ -81,6 +81,14 @@
      (inv-vectors (inv-vector-list :count cnt))))
 
 (bindata:define-binary-class txn ()
+    ((version u32le)
+     (tx-in-count varint)
+     (tx-in (tx-in-list :count tx-in-count))
+     (tx-out-count varint)
+     (tx-out (tx-out-list :count tx-out-count))
+     (lock-time u32le)))
+
+(define-p2p-msg tx
   ((version u32le)
    (tx-in-count varint)
    (tx-in (tx-in-list :count tx-in-count))
@@ -101,5 +109,3 @@
 (define-p2p-msg addr
     ((cnt varint)
      (addresses (addr-list :count cnt))))
-
-

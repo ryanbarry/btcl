@@ -154,7 +154,7 @@
              (bindata:write-value 'tx-in out tx-in))))
 
 (bindata:define-binary-class tx-out ()
-  ((value s64le)
+  ((value u64le)
    (script-len varint)
    (pub-key-script (raw-bytes :size script-len))))
 
