@@ -91,7 +91,8 @@
                      (setf uidata (acons "type" "block" uidata))
                      (setf uidata (acons "numtx" txn-count uidata))
                      (setf uidata (acons "timestamp" timestamp uidata))
-                     (setf uidata (acons "diff" (* bits (expt 2 (* 8 (- #x1b 3)))) uidata)))
+                     (setf uidata (acons "diff" (/ #xFFFF0000000000000000000000000000000000000000000000000000
+                                                 (* (ldb (byte 24 0) bits) (expt 2 (* 8 (- (ldb (byte 8 24) bits) 3))))) uidata)))
                    (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata))))
                 (t (format t "~&got a new msg: ~s~%" command))))))))
 
