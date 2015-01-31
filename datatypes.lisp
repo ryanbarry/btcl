@@ -122,29 +122,54 @@
 (defgeneric build-ip-addr (addr)
   (:documentation "make a 16-byte address in network byte order"))
 
+;; (defmethod build-ip-addr ((addr string))
+;;   (let ((result 0))
+;;     (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
+;;     (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
+;;     (loop with lowbit = 96
+;;        with byte = 0
+;;        for char across addr
+;;        do (if (char= char #\.)
+;;               (progn (setf (ldb (byte 8 lowbit) result) byte)
+;;                      (incf lowbit 8)
+;;                      (setf byte 0))
+;;               (setf byte (+ (- (char-int char) 48) (* 10 byte))))
+;;        finally (setf (ldb (byte 8 lowbit) result) byte))
+;;     result))
+
 (defmethod build-ip-addr ((addr string))
-  (let ((result 0))
-    (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
-    (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
-    (loop with lowbit = 96
+  (let ((ip-addr (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0)))
+    (setf (elt ip-addr 10) 255) ;;;; 0xFFFF to represent IPv4
+    (setf (elt ip-addr 11) 255) ;;;; address within IPv6 address
+    (loop for char across addr
+       with pos = 12
        with byte = 0
-       for char across addr
-       do (if (char= char #\.)
-              (progn (setf (ldb (byte 8 lowbit) result) byte)
-                     (incf lowbit 8)
-                     (setf byte 0))
-              (setf byte (+ (- (char-int char) 48) (* 10 byte))))
-       finally (setf (ldb (byte 8 lowbit) result) byte))
-    result)))
+       when (char= char #\.)
+       do (progn
+            (setf (elt ip-addr pos) byte)
+            (incf pos)
+            (setf byte 0))
+       else do (setf byte (+ (- (char-int char) 48) (* 10 byte)))
+       finally (setf (elt ip-addr pos) byte))
+    ip-addr))
 
 (defmethod build-ip-addr (addr)
-  (if (or (< (length addr) 4) (some #'> addr '(255 255 255 255)))
-      (error "You must specify the address as a list of 4 numbers, e.g. 192 168 1 10")
-      (let ((result 0))
-        (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
-        (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
-        (setf (ldb (byte 8 96) result) (elt addr 0))
-        (setf (ldb (byte 8 104) result) (elt addr 1))
-        (setf (ldb (byte 8 112) result) (elt addr 2))
-        (setf (ldb (byte 8 120) result) (elt addr 3))
-        result)))
+  (let ((ip-addr (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0)))
+    (setf (elt ip-addr 10) 255)
+    (setf (elt ip-addr 11) 255)
+    (loop for byte in addr
+         for i from 12 upto 16
+       do (setf (elt ip-addr i) byte))
+    ip-addr))
+
+;; (defmethod build-ip-addr (addr)
+;;   (if (or (< (length addr) 4) (some #'> addr '(255 255 255 255)))
+;;       (error "You must specify the address as a list of 4 numbers, e.g. 192 168 1 10")
+;;       (let ((result 0))
+;;         (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
+;;         (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
+;;         (setf (ldb (byte 8 96) result) (elt addr 0))
+;;         (setf (ldb (byte 8 104) result) (elt addr 1))
+;;         (setf (ldb (byte 8 112) result) (elt addr 2))
+;;         (setf (ldb (byte 8 120) result) (elt addr 3))
+;;         result)))

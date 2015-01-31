@@ -7,7 +7,7 @@
 ;; common structures
 (bindata:define-binary-class version-net-addr ()
   ((services u64le)
-   (ip-addr (u128le :size 16))
+   (ip-addr (raw-bytes :size 16))
    (port u16be)))
 
 (bindata:define-binary-class net-addr ()
@@ -32,13 +32,14 @@
 (defgeneric checksum-payload (msg))
 
 (defmacro define-p2p-msg (name slots)
-  (macut:with-gensyms (objectvar streamvar slotvar bytesvar)
+  (macut:with-gensyms (objectvar streamvar slotvar bytesvar slottypevar)
     `(progn
        (bindata:define-binary-class ,name (p2p-msg) ,slots)
        (defmethod checksum-payload ((,objectvar ,name))
          (let ((,streamvar (ironclad:make-octet-output-stream)))
            (dolist (,slotvar ',slots)
-             (bindata:write-value (cadr ,slotvar) ,streamvar (slot-value ,objectvar (car ,slotvar))))
+             (let ((,slottypevar (cadr ,slotvar)))
+              (bindata:write-value (if (typep ,slottypevar 'list) (car ,slottypevar) ,slottypevar) ,streamvar (slot-value ,objectvar (car ,slotvar)))))
            (let ((,bytesvar (ironclad:get-output-stream-octets ,streamvar)))
              (values (dsha256-checksum ,bytesvar)
                      (length ,bytesvar))))))))
