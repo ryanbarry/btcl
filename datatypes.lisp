@@ -174,7 +174,7 @@
        finally (setf (elt ip-addr pos) byte))
     ip-addr))
 
-(defmethod build-ip-addr (addr)
+(defmethod build-ip-addr ((addr list))
   (let ((ip-addr (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0)))
     (setf (elt ip-addr 10) 255)
     (setf (elt ip-addr 11) 255)
