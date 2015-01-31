@@ -104,6 +104,17 @@
   ((len varint)
    (str (iso-8859-1-string :length len))))
 
+(bindata:define-binary-class version-net-addr ()
+  ((services u64le)
+   (ip-addr (raw-bytes :size 16))
+   (port u16be)))
+
+(bindata:define-binary-class net-addr ()
+  ((timestamp u32le)
+   (services u64le)
+   (ip-addr (raw-bytes :size 16))
+   (port u16be)))
+
 (bindata:define-binary-type addr-list (count)
   (:reader (in)
            (loop for i from 0 upto count

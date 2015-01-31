@@ -10,5 +10,5 @@
                (:file "blockfile-read")
                (:file "digest")
                (:file "datatypes")
-               (:file "net")
+               (:file "wire")
                (:file "peer")))
