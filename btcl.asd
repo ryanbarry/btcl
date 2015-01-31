@@ -6,8 +6,6 @@
                (:file "portable-pathnames")
                (:file "binary-data")
                (:file "time")
-               (:file "block")
-               (:file "blockfile-read")
                (:file "digest")
                (:file "datatypes")
                (:file "wire")
