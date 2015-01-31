@@ -117,10 +117,8 @@
 
 (bindata:define-binary-type addr-list (count)
   (:reader (in)
-           (loop for i from 0 upto count
-              for addr = (bindata:read-value 'net-addr in)
-              while addr
-              collect addr))
+           (loop repeat count
+              collect (bindata:read-value 'net-addr in)))
   (:writer (out net-addrs)
            (dolist (net-addr net-addrs)
              (bindata:write-value 'net-addr out net-addr))))
@@ -131,10 +129,8 @@
 
 (bindata:define-binary-type inv-vector-list (count)
   (:reader (in)
-           (loop for i from 0 upto count
-              for inv-vector = (bindata:read-value 'inv-vector in)
-              while inv-vector
-              collect inv-vector))
+           (loop repeat count
+              collect (bindata:read-value 'inv-vector in)))
   (:writer (out inv-vectors)
            (dolist (inv-vec inv-vectors)
              (bindata:write-value 'inv-vector out inv-vec))))
