@@ -45,17 +45,21 @@
                      (length ,bytesvar))))))))
 
 (define-p2p-msg msg-version
-  ((version s32le)
-   (services u64le)
-   (timestamp s64le)
-   (addr-recv version-net-addr)
-   (addr-from version-net-addr)
-   (nonce u64le)
-   (user-agent varstr)
-   (start-height s32le)
-   (relay u8)))
+    ((version u32le)
+     (services u64le)
+     (timestamp u64le)
+     (addr-recv version-net-addr)
+     (addr-from version-net-addr)
+     (nonce u64le)
+     (user-agent varstr)
+     (start-height u32le)
+     (relay u8)))
 
 (define-p2p-msg msg-verack ())
+
+(define-p2p-msg msg-inv
+    ((cnt varint)
+     (inv-vectors (inv-vector-list :count cnt))))
 
 (define-p2p-msg msg-addr
   ((#:count varint)

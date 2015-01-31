@@ -114,6 +114,20 @@
            (dolist (net-addr net-addrs)
              (bindata:write-value 'net-addr out net-addr))))
 
+(bindata:define-binary-class inv-vector ()
+  ((obj-type u32le)
+   (hash (raw-bytes :size 32))))
+
+(bindata:define-binary-type inv-vector-list (count)
+  (:reader (in)
+           (loop for i from 0 upto count
+              for inv-vector = (bindata:read-value 'inv-vector in)
+              while inv-vector
+              collect inv-vector))
+  (:writer (out inv-vectors)
+           (dolist (inv-vec inv-vectors)
+             (bindata:write-value 'inv-vector out inv-vec))))
+
 (defun make-varstr (str)
   (make-instance 'varstr
                  :len (length str)
