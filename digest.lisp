@@ -17,6 +17,3 @@
       (reinitialize-instance digester)
       (ironclad:update-digest digester 1st-round)
       (ironclad:produce-digest digester))))
-
-(defun hash-txn (txn)
-  (ironclad:make-octet-))

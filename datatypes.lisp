@@ -1,5 +1,6 @@
-(in-package :btcl-net)
+(in-package :btcl-types)
 
+;; binary blobs
 (bindata:define-binary-type raw-bytes (size)
   (:reader (in)
            (let ((buf (make-array size :element-type '(unsigned-byte 8))))
@@ -8,6 +9,7 @@
   (:writer (out buf)
            (write-sequence buf out)))
 
+;; various integer formats
 (bindata:define-binary-type unsigned-integer-be (bytes)
   (:reader (in)
            (loop with value = 0
@@ -17,9 +19,6 @@
   (:writer (out value)
            (loop for low-bit downfrom (* 8 (1- bytes)) to 0 by 8
               do (write-byte (ldb (byte 8 low-bit) value) out))))
-(bindata:define-binary-type u16be () (unsigned-integer-be :bytes 2))
-(bindata:define-binary-type u32be () (unsigned-integer-be :bytes 4))
-(bindata:define-binary-type u64be () (unsigned-integer-be :bytes 8))
 
 (defun read-unsigned-le (in bytes)
   (loop with value = 0
@@ -33,10 +32,6 @@
 (bindata:define-binary-type unsigned-integer-le (bytes)
   (:reader (in) (read-unsigned-le in bytes))
   (:writer (out value) (write-unsigned-le out value bytes)))
-(bindata:define-binary-type u8 () (unsigned-integer-le :bytes 1))
-(bindata:define-binary-type u16le () (unsigned-integer-le :bytes 2))
-(bindata:define-binary-type u32le () (unsigned-integer-le :bytes 4))
-(bindata:define-binary-type u64le () (unsigned-integer-le :bytes 8))
 
 (bindata:define-binary-type signed-integer-le (bytes)
   (:reader (in)
@@ -50,10 +45,22 @@
                (write-unsigned-le out value bytes)
                (error "Writing negative values isn't implemented yet lulz"))))
 
+;; just one byte, can't technically be little- or big-endian, w/e
+(bindata:define-binary-type u8 () (unsigned-integer-le :bytes 1))
+
+;; big-endian types used
+(bindata:define-binary-type u16be () (unsigned-integer-be :bytes 2))
+(bindata:define-binary-type u32be () (unsigned-integer-be :bytes 4))
+(bindata:define-binary-type u64be () (unsigned-integer-be :bytes 8))
+
+;; little-endian
+(bindata:define-binary-type u16le () (unsigned-integer-le :bytes 2))
+(bindata:define-binary-type u32le () (unsigned-integer-le :bytes 4))
+(bindata:define-binary-type u64le () (unsigned-integer-le :bytes 8))
 (bindata:define-binary-type s32le () (signed-integer-le :bytes 4))
 (bindata:define-binary-type s64le () (signed-integer-le :bytes 8))
 
-;; this is CompactSize in BitcoinQT
+;; CompactSize in BitcoinQT
 (bindata:define-binary-type varint ()
   (:reader (in)
            (let ((lowbyte (read-byte in)))
@@ -70,6 +77,7 @@
                  (t (progn (write-byte #xff out)
                            (write-unsigned-le out value 8))))))
 
+;; string of defined length, in characters, where char type is defined separately
 (bindata:define-binary-type generic-string (length character-type)
   (:reader (in)
            (let ((string (make-string length))
@@ -86,6 +94,7 @@
                (dotimes (i (- length (length string)))
                  (write-byte 0 out)))))
 
+;; character type meant to be used with generic-string
 (bindata:define-binary-type iso-8859-1-char ()
   (:reader (in)
            (let ((code (read-byte in)))
@@ -97,24 +106,34 @@
                  (write-byte code out)
                  (error "Illegal character for iso-8859-1 encoding: character: ~c with code: ~d" char code)))))
 
+;; concrete string type
 (bindata:define-binary-type iso-8859-1-string (length)
   (generic-string :length length :character-type 'iso-8859-1-char))
 
-(bindata:define-binary-class varstr ()
-  ((len varint)
-   (str (iso-8859-1-string :length len))))
+;; iso-8859-1 string whose length is defined with a varint
+(bindata:define-binary-type varstr ()
+  (:reader (in)
+           (let ((len (bindata:read-value 'varint in)))
+             (bindata:read-value 'iso-8859-1-string in :length len)))
+  (:writer (out value)
+           (let ((len (length value)))
+             (bindata:write-value 'varint out len)
+             (bindata:write-value 'iso-8859-1-string out value :length len))))
 
-(bindata:define-binary-class version-net-addr ()
-  ((services u64le)
-   (ip-addr (raw-bytes :size 16))
-   (port u16be)))
-
+;; structure used to describe node addresses
 (bindata:define-binary-class net-addr ()
   ((timestamp u32le)
    (services u64le)
    (ip-addr (raw-bytes :size 16))
    (port u16be)))
 
+;; special form of net-addr used in the "version" message
+(bindata:define-binary-class version-net-addr ()
+  ((services u64le)
+   (ip-addr (raw-bytes :size 16))
+   (port u16be)))
+
+;; list of net-addr
 (bindata:define-binary-type addr-list (count)
   (:reader (in)
            (loop repeat count
@@ -123,10 +142,12 @@
            (dolist (net-addr net-addrs)
              (bindata:write-value 'net-addr out net-addr))))
 
+;; identifier for "inventory" (blocks, transactions, etc)
 (bindata:define-binary-class inv-vector ()
   ((obj-type u32le)
    (hash (raw-bytes :size 32))))
 
+;; list of inv-vector
 (bindata:define-binary-type inv-vector-list (count)
   (:reader (in)
            (loop repeat count
@@ -135,16 +156,19 @@
            (dolist (inv-vec inv-vectors)
              (bindata:write-value 'inv-vector out inv-vec))))
 
+;; pointer to prior transaction's output
 (bindata:define-binary-class outpoint ()
   ((hash (raw-bytes :size 32))
    (index u32le)))
 
+;; transaction input
 (bindata:define-binary-class tx-in ()
   ((previous-output outpoint)
    (script-len varint)
-   (sig-script (raw-bytes :size script-len))
+   (script-sig (raw-bytes :size script-len))
    (seq u32le)))
 
+;; list of transaction inputs
 (bindata:define-binary-type tx-in-list (count)
   (:reader (in)
            (loop repeat count
@@ -153,11 +177,13 @@
            (dolist (tx-in tx-in-list)
              (bindata:write-value 'tx-in out tx-in))))
 
+;; transaction output
 (bindata:define-binary-class tx-out ()
   ((value u64le)
    (script-len varint)
-   (pub-key-script (raw-bytes :size script-len))))
+   (script-pk (raw-bytes :size script-len))))
 
+;; list of transaction outputs
 (bindata:define-binary-type tx-out-list (count)
   (:reader (in)
            (loop repeat count
@@ -166,37 +192,40 @@
            (dolist (tx-out tx-out-list)
              (bindata:write-value 'tx-out out tx-out))))
 
-(bindata:define-binary-type txn-list (count)
+(bindata:define-binary-class tx ()
+    ((version u32le)
+     (tx-in-count varint)
+     (tx-in (tx-in-list :count tx-in-count))
+     (tx-out-count varint)
+     (tx-out (tx-out-list :count tx-out-count))
+     (lock-time u32le)))
+
+;; list of transactions
+(bindata:define-binary-type tx-list (count)
   (:reader (in)
            (loop repeat count
-              collect (bindata:read-value 'txn in)))
+              collect (bindata:read-value 'tx in)))
   (:writer (out txn-list)
-           (dolist (txn txn-list)
-             (bindata:write-value 'txn out txn))))
+           (dolist (txn tx-list)
+             (bindata:write-value 'tx out txn))))
 
-(defun make-varstr (str)
-  (make-instance 'varstr
-                 :len (length str)
-                 :str str))
+;; block (named in order to not conflict with CL's block)
+(bindata:define-binary-class blk ()
+  ((version u32le)
+   (hash-prev-block (raw-bytes :size 32))
+   (hash-merkle-root (raw-bytes :size 32))
+   (timestamp u32le)
+   (bits u32le)
+   (nonce u32le)
+   (txn-count varint)
+   (txn-list (txn-list :count txn-count))))
+
+;;; helpers
 
 (defgeneric build-ip-addr (addr)
   (:documentation "make a 16-byte address in network byte order"))
 
-;; (defmethod build-ip-addr ((addr string))
-;;   (let ((result 0))
-;;     (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
-;;     (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
-;;     (loop with lowbit = 96
-;;        with byte = 0
-;;        for char across addr
-;;        do (if (char= char #\.)
-;;               (progn (setf (ldb (byte 8 lowbit) result) byte)
-;;                      (incf lowbit 8)
-;;                      (setf byte 0))
-;;               (setf byte (+ (- (char-int char) 48) (* 10 byte))))
-;;        finally (setf (ldb (byte 8 lowbit) result) byte))
-;;     result))
-
+;; make it from a dotted-quad format string, e.g. "192.168.1.25"
 (defmethod build-ip-addr ((addr string))
   (let ((ip-addr (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0)))
     (setf (elt ip-addr 10) 255) ;;;; 0xFFFF to represent IPv4
@@ -213,6 +242,7 @@
        finally (setf (elt ip-addr pos) byte))
     ip-addr))
 
+;; make it from a dotted-quad-like list, e.g. '(192 168 1 25)
 (defmethod build-ip-addr ((addr list))
   (let ((ip-addr (make-array 16 :element-type '(unsigned-byte 8) :initial-element 0)))
     (setf (elt ip-addr 10) 255)
@@ -221,15 +251,3 @@
          for i from 12 upto 16
        do (setf (elt ip-addr i) byte))
     ip-addr))
-
-;; (defmethod build-ip-addr (addr)
-;;   (if (or (< (length addr) 4) (some #'> addr '(255 255 255 255)))
-;;       (error "You must specify the address as a list of 4 numbers, e.g. 192 168 1 10")
-;;       (let ((result 0))
-;;         (setf (ldb (byte 8 80) result) 255) ;;;; 0xFFFF to represent IPv4
-;;         (setf (ldb (byte 8 88) result) 255) ;;;; address within IPv6 address
-;;         (setf (ldb (byte 8 96) result) (elt addr 0))
-;;         (setf (ldb (byte 8 104) result) (elt addr 1))
-;;         (setf (ldb (byte 8 112) result) (elt addr 2))
-;;         (setf (ldb (byte 8 120) result) (elt addr 3))
-;;         result)))

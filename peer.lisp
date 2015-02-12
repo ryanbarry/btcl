@@ -1,4 +1,4 @@
-(in-package :btcl-net)
+(in-package :btcl-wire)
 
 (defparameter *debug* t)
 
@@ -59,9 +59,9 @@
                  (format t "~&handshaken: ~d~%" handshaken))
                 ((string= command "version")
                  (with-slots (version user-agent start-height) msg
-                   (format t "~&receive version message: ~s: version ~d, blocks=~d" (slot-value user-agent 'str) version start-height))
+                   (format t "~&receive version message: ~s: version ~d, blocks=~d" user-agent version start-height))
                  (setf handshaken (boole boole-ior handshaken #b01))
-                 (send-msg remote (prep-msg (make-instance 'verack)))
+                 (send-msg remote (prep-msg (make-instance 'msg-verack)))
                  (format t "~&handshaken: ~d~%" handshaken))
                 ((string= command "inv")
                  (format t "~&got some inventory!")
@@ -69,30 +69,30 @@
                    (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
                    (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
                            cnt
-                           (slot-value (car inv-vectors) 'obj-type)
-                           (slot-value (car inv-vectors) 'hash))
-                   (send-msg remote (prep-msg (make-instance 'getdata :cnt cnt :inv-vectors inv-vectors)))))
+                           (slot-value (car inv-vectors) 'bty::obj-type)
+                           (slot-value (car inv-vectors) 'bty::hash))
+                   (send-msg remote (prep-msg (make-instance 'msg-getdata :cnt cnt :inv-vectors inv-vectors)))))
                 ((string= command "tx")
                  (format t "~&got a tx!")
                  (let ((uidata '()))
-                   (with-slots (tx-in-count tx-out-count tx-out) msg
+                   (with-slots (bty::tx-in-count bty::tx-out-count bty::tx-out) (slot-value msg 'tx)
                      (let ((tx-total-value (/ (loop for txo in tx-out
-                                                 sum (slot-value txo 'value)) 100000000)))
+                                                 sum (slot-value txo 'bty::value)) 100000000)))
                        (setf uidata (acons "type" "tx" uidata))
                        (setf uidata (acons "hash" (format nil "~a" (ironclad:byte-array-to-hex-string (reverse msg-hash))) uidata))
-                       (setf uidata (acons "tx-in-count" tx-in-count uidata))
-                       (setf uidata (acons "tx-out-count" tx-out-count uidata))
+                       (setf uidata (acons "tx-in-count" bty::tx-in-count uidata))
+                       (setf uidata (acons "tx-out-count" bty::tx-out-count uidata))
                        (setf uidata (acons "total-sent" (format nil "~8,1,,$" tx-total-value) uidata)))
                      (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata)))))
                 ((string= command "block")
                  (format t "~&got a block!~%")
                  (let ((uidata '()))
-                   (with-slots (txn-count timestamp bits) msg
+                   (with-slots (bty::txn-count bty::timestamp bty::bits) (slot-value msg 'blk)
                      (setf uidata (acons "type" "block" uidata))
-                     (setf uidata (acons "numtx" txn-count uidata))
-                     (setf uidata (acons "timestamp" timestamp uidata))
+                     (setf uidata (acons "numtx" bty::txn-count uidata))
+                     (setf uidata (acons "timestamp" bty::timestamp uidata))
                      (setf uidata (acons "diff" (/ #xFFFF0000000000000000000000000000000000000000000000000000
-                                                 (* (ldb (byte 24 0) bits) (expt 2 (* 8 (- (ldb (byte 8 24) bits) 3))))) uidata)))
+                                                 (* (ldb (byte 24 0) bty::bits) (expt 2 (* 8 (- (ldb (byte 8 24) bty::bits) 3))))) uidata)))
                    (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata))))
                 (t (format t "~&got a new msg: ~s~%" command))))))))
 
@@ -109,7 +109,7 @@
                                   :event-cb #'event-cb)))
       (setf (slot-value remote 'tcp-socket) tcpsock)
       (setf (slot-value remote 'write-stream) (make-instance 'as:async-output-stream :socket tcpsock)))
-    (send-msg remote (prep-msg (make-instance 'version
+    (send-msg remote (prep-msg (make-instance 'msg-version
                                      :version 70002
                                      :services 1
                                      :timestamp (get-unix-time)
@@ -122,7 +122,7 @@
                                                                :ip-addr (build-ip-addr "0.0.0.0")
                                                                :port 0)
                                      :nonce (random (expt 2 64))
-                                     :user-agent (make-varstr "/btcl:0.0.2/")
+                                     :user-agent "/btcl:0.0.2/"
                                      :start-height 0
                                      :relay 1)))
     (btcl-web:start-server)))

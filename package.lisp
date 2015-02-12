@@ -62,17 +62,64 @@
            #:print-block
            #:get-unix-time))
 
+(defpackage #:btcl-web
+  (:use :cl :cl-ppcre :cl-async :cl-who :parenscript)
+  (:import-from :babel #:octets-to-string)
+  (:export #:start-server
+           #:publish!))
+
+(defpackage #:btcl-constants
+  (:use #:cl)
+  (:export #:+TESTNET3-MAGIC+
+           #:+TESTNET3-GENESIS-BLOCK+
+           #:+MAINNET-MAGIC+
+           #:+MAINNET-GENESIS-BLOCK+))
+
 (defpackage #:btcl-digest
   (:use #:cl #:btcl)
   (:export #:dsha256-checksum))
 
-(defpackage #:btcl-net
-  (:use #:cl #:btcl #:btcl-digest)
-  (:shadow :block)
-  (:export #:build-ip-addr
-           #:start-peer))
+(defpackage #:btcl-types
+  (:nicknames #:bty)
+  (:use #:cl)
+  (:export #:raw-bytes
+           #:u8
+           #:u16be
+           #:u32be
+           #:u64be
+           #:u16le
+           #:u32le
+           #:u64le
+           #:s32le
+           #:s64le
+           #:varint
+           #:iso-8859-1-string
+           #:varstr
+           #:net-addr
+           #:version-net-addr
+           #:addr-list
+           #:inv-vector
+           #:inv-vector-list
+           #:outpoint
+           #:tx-in
+           #:tx-in-list
+           #:tx-out
+           #:tx-out-list
+           #:tx
+           #:tx-list
+           #:blk
+           #:build-ip-addr))
 
-(defpackage #:btcl-web
-  (:use :cl :cl-ppcre :cl-async :cl-who :parenscript)
-  (:import-from :babel #:octets-to-string)
-  (:export #:start-server #:publish!))
+(defpackage #:btcl-wire
+  (:nicknames #:btw)
+  (:use #:cl #:btcl #:btcl-digest #:btcl-util #:btcl-types)
+  (:export #:peer-connection
+           #:start-peer
+           #:msg-version
+           #:msg-verack
+           #:msg-inv
+           #:msg-getdata
+           #:msg-tx
+           #:msg-block
+           #:msg-addr))
+

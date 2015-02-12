@@ -1,8 +1,4 @@
-(in-package :btcl-net)
-
-;;; constants
-(defconstant +TESTNET3-MAGIC+ #x0709110b) ; network byte order
-(defconstant +MAINNET-MAGIC+ #xfeb4bef9) ; network byte order
+(in-package :btcl-wire)
 
 ;;; connection structure
 (defclass peer-connection ()
@@ -25,7 +21,7 @@
 
 (defun find-msg-class (name)
   (multiple-value-bind (sym status)
-      (find-symbol (string-upcase name))
+      (find-symbol (concatenate 'string "MSG-" (string-upcase name)) :btcl-wire)
     (declare (ignore status))
     sym))
 
@@ -52,16 +48,16 @@
        (defmethod prep-msg ((,objectvar ,name))
          (with-slots (command checksum len) ,objectvar
            (multiple-value-bind (,retcksmvar ,retlenvar) (checksum-payload ,objectvar)
-             (setf command (string-downcase (symbol-name ',name)))
+             (setf command (subseq (string-downcase (symbol-name ',name)) 4))
              (setf checksum ,retcksmvar)
              (setf len ,retlenvar)
              ,objectvar)))
        (defmethod send-msg (,remvar (,objectvar ,name))
-         (setf (slot-value ,objectvar 'magic) (symbol-value (find-symbol (concatenate 'string "+" (symbol-name (slot-value ,remvar 'net)) "-MAGIC+"))))
+         (setf (slot-value ,objectvar 'magic) (symbol-value (find-symbol (concatenate 'string "+" (symbol-name (slot-value ,remvar 'net)) "-MAGIC+") :btcl-constants)))
          (bindata:write-value ',name (slot-value ,remvar 'write-stream) ,objectvar)))))
 
 ;;; now come the message types in the p2p protocol
-(define-p2p-msg version
+(define-p2p-msg msg-version
     ((version u32le)
      (services u64le)
      (timestamp u64le)
@@ -72,42 +68,22 @@
      (start-height u32le)
      (relay u8)))
 
-(define-p2p-msg verack ())
+(define-p2p-msg msg-verack ())
 
-(define-p2p-msg inv
+(define-p2p-msg msg-inv
     ((cnt varint)
      (inv-vectors (inv-vector-list :count cnt))))
 
-(define-p2p-msg getdata
+(define-p2p-msg msg-getdata
     ((cnt varint)
      (inv-vectors (inv-vector-list :count cnt))))
 
-(bindata:define-binary-class txn ()
-    ((version u32le)
-     (tx-in-count varint)
-     (tx-in (tx-in-list :count tx-in-count))
-     (tx-out-count varint)
-     (tx-out (tx-out-list :count tx-out-count))
-     (lock-time u32le)))
+(define-p2p-msg msg-tx
+    ((tx tx)))
 
-(define-p2p-msg tx
-  ((version u32le)
-   (tx-in-count varint)
-   (tx-in (tx-in-list :count tx-in-count))
-   (tx-out-count varint)
-   (tx-out (tx-out-list :count tx-out-count))
-   (lock-time u32le)))
+(define-p2p-msg msg-block
+    ((blk blk)))
 
-(define-p2p-msg block
-    ((version u32le)
-     (hash-prev-block (raw-bytes :size 32))
-     (hash-merkle-root (raw-bytes :size 32))
-     (timestamp u32le)
-     (bits u32le)
-     (nonce u32le)
-     (txn-count varint)
-     (txn-list (txn-list :count txn-count))))
-
-(define-p2p-msg addr
+(define-p2p-msg msg-addr
     ((cnt varint)
      (addresses (addr-list :count cnt))))
