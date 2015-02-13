@@ -205,7 +205,7 @@
   (:reader (in)
            (loop repeat count
               collect (bindata:read-value 'tx in)))
-  (:writer (out txn-list)
+  (:writer (out tx-list)
            (dolist (txn tx-list)
              (bindata:write-value 'tx out txn))))
 
@@ -217,8 +217,8 @@
    (timestamp u32le)
    (bits u32le)
    (nonce u32le)
-   (txn-count varint)
-   (txn-list (txn-list :count txn-count))))
+   (tx-count varint)
+   (tx-list (tx-list :count tx-count))))
 
 ;;; helpers
 

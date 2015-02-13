@@ -22,25 +22,25 @@
 (defun make-read-cb (remote)
   (lambda (socket bytevec)
     (declare (ignore socket))
-    (with-slots (read-stream read-buffer) remote
-      ;; put incoming data on input stream
-      (setf read-stream (if (eql nil read-stream)
-                            (ironclad:make-octet-input-stream bytevec)
-                            (make-concatenated-stream read-stream (ironclad:make-octet-input-stream bytevec))))
+    (with-slots (read-stream read-buffers) remote
+      ;; accumulate latest incoming transmission
+      (push bytevec read-buffers)
+      ;; turn all unread input into a stream
+      (setf read-stream (apply #'make-concatenated-stream
+                               (cons read-stream (mapcar #'ironclad:make-octet-input-stream
+                                                         (reverse read-buffers))))))
       ;; try parsing message out of data collected so far
       (format t "~&trying to read msg...")
       (handler-case (message-handler remote)
         ;; if it can't read an entire message before eof'ing, put data back on stream
         (end-of-file ()
-          (format t "eof'd before getting a whole message~%")
-          (setf read-stream (if (eql nil read-stream)
-                                (ironclad:make-octet-input-stream bytevec)
-                                (make-concatenated-stream read-stream (ironclad:make-octet-input-stream bytevec)))))
+          (format t "eof'd before getting a whole message~%"))
         (invalid-msg (reason)
           (format t "~&error: bad msg! (~s)~%" reason))
         ;; if it's successful, clear buffer and continue
         (:no-error (handler-result)
-          (declare (ignore handler-result)))))))
+          (declare (ignore handler-result))
+          (setf (slot-value remote 'read-buffers) '())))))
 
 (defun message-handler (remote)
   (let ((msg (bindata:read-value 'p2p-msg (slot-value remote 'read-stream))))
@@ -67,11 +67,16 @@
                  (format t "~&got some inventory!")
                  (with-slots (magic command len checksum cnt inv-vectors) msg
                    (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
-                   (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
-                           cnt
-                           (slot-value (car inv-vectors) 'bty::obj-type)
-                           (slot-value (car inv-vectors) 'bty::hash))
-                   (send-msg remote (prep-msg (make-instance 'msg-getdata :cnt cnt :inv-vectors inv-vectors)))))
+                   (let ((interesting-inventory (loop for inv in inv-vectors
+                                                   for objtype = (slot-value inv 'bty::obj-type)
+                                                   for hsh = (slot-value inv 'bty::hash)
+                                                   do (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
+                                                              cnt objtype hsh)
+                                                   when (or (= objtype 1) (= objtype 2))
+                                                   collect inv)))
+                     (send-msg remote (prep-msg (make-instance 'msg-getdata
+                                                               :cnt (length interesting-inventory)
+                                                               :inv-vectors interesting-inventory))))))
                 ((string= command "tx")
                  (format t "~&got a tx!")
                  (let ((uidata '()))
@@ -87,9 +92,9 @@
                 ((string= command "block")
                  (format t "~&got a block!~%")
                  (let ((uidata '()))
-                   (with-slots (bty::txn-count bty::timestamp bty::bits) (slot-value msg 'blk)
+                   (with-slots (bty::tx-count bty::timestamp bty::bits) (slot-value msg 'blk)
                      (setf uidata (acons "type" "block" uidata))
-                     (setf uidata (acons "numtx" bty::txn-count uidata))
+                     (setf uidata (acons "numtx" bty::tx-count uidata))
                      (setf uidata (acons "timestamp" bty::timestamp uidata))
                      (setf uidata (acons "diff" (/ #xFFFF0000000000000000000000000000000000000000000000000000
                                                  (* (ldb (byte 24 0) bty::bits) (expt 2 (* 8 (- (ldb (byte 8 24) bty::bits) 3))))) uidata)))
@@ -104,9 +109,9 @@
                        (format t "~&got sigint, stopping peer...~%")
                        (as:exit-event-loop)))
     (let ((tcpsock (as:tcp-connect (slot-value remote 'host)
-                                  (slot-value remote 'port)
-                                  (make-read-cb remote)
-                                  :event-cb #'event-cb)))
+                                   (slot-value remote 'port)
+                                   (make-read-cb remote)
+                                   :event-cb #'event-cb)))
       (setf (slot-value remote 'tcp-socket) tcpsock)
       (setf (slot-value remote 'write-stream) (make-instance 'as:async-output-stream :socket tcpsock)))
     (send-msg remote (prep-msg (make-instance 'msg-version

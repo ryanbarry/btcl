@@ -8,8 +8,9 @@
    (handshaken :initform #b00) ; low bit means version rec'd, 2nd is verack rec'd
    (tcp-socket)
    (write-stream)
-   (read-stream :initform nil)
-   (read-buffer :initform nil)))
+   (read-stream :initform (ironclad:make-octet-input-stream
+                           (make-array 0 :element-type '(unsigned-byte 8))))
+   (read-buffers :initform '())))
 
 ;;; msg header definition and macro to create all the types
 (bindata:define-tagged-binary-class p2p-msg ()
