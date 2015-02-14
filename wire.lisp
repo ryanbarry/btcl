@@ -1,6 +1,6 @@
 (in-package :btcl-wire)
 
-;;; connection structure
+;;; connection structure & functions for networking that use it
 (defclass peer-connection ()
   ((host :initarg :host)
    (port :initarg :port)
@@ -8,17 +8,47 @@
    (handshaken :initform #b00) ; low bit means version rec'd, 2nd is verack rec'd
    (tcp-socket)
    (write-stream)
-   (read-stream :initform (ironclad:make-octet-input-stream
-                           (make-array 0 :element-type '(unsigned-byte 8))))
    (read-buffers :initform '())))
 
-;;; msg header definition and macro to create all the types
-(bindata:define-tagged-binary-class p2p-msg ()
+(defun accumulate-input (remote input-bytevec)
+  (push (slot-value remote 'read-buffers) input-bytevec))
+
+(defun sizeof-read-buffer (remote)
+  (reduce #'+ (map 'list #'length (slot-value remote 'read-buffers)) :initial-value 0))
+
+(defun get-octet-input-stream (remote &optional length)
+  (if (eql nil length)
+      (apply #'make-concatenated-stream
+             (map 'list #'ironclad:make-octet-input-stream (slot-value remote 'read-buffers)))
+      (apply #'make-concatenated-stream
+             (loop with length-needed = length
+                for buf in (slot-value remote 'read-buffers)
+                for buf-size = (length buf)
+                collect (if (> buf-size length-needed)
+                            (progn ; add to current stream as many bytes as we can get, then add on to the current-length
+                              (setf length-needed 0)
+                              (ironclad:make-octet-input-stream buf 0 length-needed))
+                            (progn
+                              (decf length-needed buf-size)
+                              (ironclad:make-octet-input-stream buf)))))))
+
+(defun octet-input-stream-to-vector (stream)
+  (let ((s (ironclad:make-octet-output-stream)))
+    (handler-case (loop for b = (read-byte stream)
+                     do (write-byte b s))
+      (:eof-error ()
+        (ironclad:get-output-stream-octets s)))))
+
+;;; msg header and message definition plus macro to create all the types
+(bindata:define-binary-class p2p-msg-header ()
   ((magic u32le)
    (command (iso-8859-1-string :length 12))
    (len u32le)
-   (checksum u32le))
-  (:dispatch (find-msg-class command)))
+   (checksum u32le)))
+
+(bindata:define-tagged-binary-class p2p-msg ()
+  ((header p2p-msg-header))
+  (:dispatch (find-msg-class (slot-value header 'command))))
 
 (defun find-msg-class (name)
   (multiple-value-bind (sym status)

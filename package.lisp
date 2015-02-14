@@ -69,8 +69,10 @@
            #:publish!))
 
 (defpackage #:btcl-constants
+  (:nicknames #:btconst)
   (:use #:cl)
-  (:export #:+TESTNET3-MAGIC+
+  (:export #:+P2P-MSG-HEADER-LEN+
+           #:+TESTNET3-MAGIC+
            #:+TESTNET3-GENESIS-BLOCK+
            #:+MAINNET-MAGIC+
            #:+MAINNET-GENESIS-BLOCK+))
