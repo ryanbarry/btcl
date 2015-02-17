@@ -20,7 +20,8 @@
 (defclass db-transaction ()
   ((hash :col-type (string 64) :initarg :hash)
    (network :col-type bigint :initarg :network)
-   (version :col-type bigint :initarg :version))
+   (version :col-type bigint :initarg :version)
+   (lock-time :col-type bigint :initarg :lock-time))
   (:metaclass pomo:dao-class)
   (:keys hash)
   (:table-name transaction))
@@ -89,7 +90,8 @@
        (list (pomo:save-dao (make-instance 'db-transaction
                                            :hash tx-hash
                                            :network btcl-constants:+TESTNET3-MAGIC+
-                                           :version bty::version))
+                                           :version bty::version
+                                           :lock-time bty::lock-time))
              (loop for txin in bty::tx-in
                 for i from 0
                 collect (with-slots (bty::previous-output bty::script-sig bty::seq) txin
