@@ -19,29 +19,62 @@
 
 (define-condition invalid-msg () (reason))
 
+(defun accumulate-input (remote input-bytevec)
+  (push input-bytevec (slot-value remote 'read-buffers)))
+
+(defun sum-list-sequence-lengths (buffers)
+  (reduce #'+ (map 'list #'length buffers) :initial-value 0))
+
+(defun make-octet-input-stream (octet-vectors)
+  (apply #'make-concatenated-stream
+         (loop
+            for ov in octet-vectors
+            when (and (not (eql nil ov)) (> (length ov) 1))
+            collect (ironclad:make-octet-input-stream ov))))
+
+(defun octet-input-stream-to-vector (stream)
+  (let ((s (ironclad:make-octet-output-stream)))
+    (handler-case (loop for b = (read-byte stream nil 'eof)
+                     until (eql b 'eof)
+                     do (write-byte b s)))))
+
+;; in: list of byte vectors
+;; out: (message or nil) and (list of byte vectors for remaining input)
+(defun try-read-message (buffers)
+  "given a list of octet vectors as a a read buffer, try to read a message"
+  (if (>= (sum-list-sequence-lengths buffers)
+          btcl-constants:+P2P-MSG-HEADER-LEN+)
+      (let* ((instream (make-octet-input-stream buffers))
+             (header (bindata:read-value 'p2p-msg-header instream)))
+        (if (>= (sum-list-sequence-lengths buffers) (+ (slot-value header 'len)
+                                                       btcl-constants:+P2P-MSG-HEADER-LEN+))
+            (let* ((instream (make-octet-input-stream buffers)))
+              (values (bindata:read-value 'p2p-msg instream)
+                      (list (octet-input-stream-to-vector instream))))
+            (values nil buffers)))
+      (values nil buffers)))
+
 (defun make-read-cb (remote)
   (lambda (socket bytevec)
     (declare (ignore socket))
     (accumulate-input remote bytevec)
-    (if (> (sizeof-read-buffer remote) btcl-constants:+P2P-MSG-HEADER-LEN+)
-        (let ((header (bindata:read-value
-                       'p2p-msg-header
-                       (get-octet-input-stream remote
-                                               btconst:+P2P-MSG-HEADER-LEN+))))
-          (let ((msg-len (+ (slot-value header 'len)
-                            btconst:+P2P-MSG-HEADER-LEN+)))
-            (if (>= (sizeof-read-buffer remote) msg-len)
-                (let* ((instream (get-octet-input-stream remote))
-                       (msg (bindata:read-value 'p2p-msg instream)))
-                  (handler-case (handle-message remote msg)
-                    (invalid-msg (reason)
-                      (format t "~&error: bad msg! (~s)~%" reason)))
-                  ;; if it's successful, clear buffer and continue
-                  (setf (slot-value remote 'read-buffers)
-                        (list (octet-input-stream-to-vector instream))))))))))
+    (loop with data-to-read = t
+       while data-to-read
+       do (multiple-value-bind (msg buf-list)
+              (try-read-message (reverse (slot-value remote 'read-buffers)))
+            (if msg
+                (progn
+                  (handle-message remote msg)
+                  ;; break loop at this point if less than a header's worth of
+                  ;; data in the buffer after reading the first message
+                  (if (< (sum-list-sequence-lengths buf-list)
+                         btcl-constants:+P2P-MSG-HEADER-LEN+)
+                      (setf data-to-read nil)))
+                (setf data-to-read nil))
+            (setf (slot-value remote 'read-buffers) buf-list)))))
 
 (defun handle-message (remote message)
-  (with-slots (command checksum) message
+  (with-slots (command checksum) (slot-value message 'header)
     (multiple-value-bind (computed-cksm length msg-hash) (checksum-payload message)
       (declare (ignore length))
       (if (/= computed-cksm checksum)
@@ -62,18 +95,19 @@
                (format t "~&handshaken: ~d~%" handshaken))
               ((string= command "inv")
                (format t "~&got some inventory!")
-               (with-slots (magic command len checksum cnt inv-vectors) message
-                 (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
-                 (let ((interesting-inventory (loop for inv in inv-vectors
-                                                 for objtype = (slot-value inv 'bty::obj-type)
-                                                 for hsh = (slot-value inv 'bty::hash)
-                                                 do (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
-                                                            cnt objtype hsh)
-                                                 when (or (= objtype 1) (= objtype 2))
-                                                 collect inv)))
-                   (send-msg remote (prep-msg (make-instance 'msg-getdata
-                                                             :cnt (length interesting-inventory)
-                                                             :inv-vectors interesting-inventory))))))
+               (with-slots (magic command len checksum cnt inv-vectors) (slot-value message 'header)
+                 (with-slots (cnt inv-vectors) message
+                  (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
+                  (let ((interesting-inventory (loop for inv in inv-vectors
+                                                  for objtype = (slot-value inv 'bty::obj-type)
+                                                  for hsh = (slot-value inv 'bty::hash)
+                                                  do (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
+                                                             cnt objtype hsh)
+                                                  when (or (= objtype 1) (= objtype 2))
+                                                  collect inv)))
+                    (send-msg remote (prep-msg (make-instance 'msg-getdata
+                                                              :cnt (length interesting-inventory)
+                                                              :inv-vectors interesting-inventory)))))))
               ((string= command "tx")
                (format t "~&got a tx!")
                (let ((uidata '()))
