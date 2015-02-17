@@ -79,7 +79,8 @@
 
 (defpackage #:btcl-digest
   (:use #:cl #:btcl)
-  (:export #:dsha256-checksum))
+  (:export #:dsha256-checksum
+           #:dsha256))
 
 (defpackage #:btcl-types
   (:nicknames #:bty)
@@ -110,7 +111,8 @@
            #:tx
            #:tx-list
            #:blk
-           #:build-ip-addr))
+           #:build-ip-addr
+           #:hash))
 
 (defpackage #:btcl-wire
   (:nicknames #:btw)
