@@ -105,11 +105,12 @@
                                                         :tx-index i))))
              (loop for txout in bty::tx-out
                 for i from 0
-                collect (pomo:save-dao (make-instance 'db-tx-out
-                                                      :value (slot-value txout 'bty::value)
-                                                      :script-pubkey (slot-value txout 'bty::script-pk)
-                                                      :transaction tx-hash
-                                                      :tx-index i))))))))
+                collect (with-slots (bty::value bty::script-pk) txout
+                          (pomo:save-dao (make-instance 'db-tx-out
+                                                        :value bty::value
+                                                        :script-pubkey bty::script-pk
+                                                        :transaction tx-hash
+                                                        :tx-index i)))))))))
 
 (defun init-db ()
   (pomo:create-package-tables 'btcl-db))
