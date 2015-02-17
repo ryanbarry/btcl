@@ -109,7 +109,10 @@
                                                               :cnt (length interesting-inventory)
                                                               :inv-vectors interesting-inventory)))))))
               ((string= command "tx")
-               (format t "~&got a tx!")
+               (format t "~&got a tx!~%")
+               (with-slots (bty::version bty::lock-time) (slot-value message 'tx)
+                (format t "version: ~a~%nLockTime: ~a~%" bty::version bty::lock-time))
+               (format t "saving...~a~%" (btcl-db:save (slot-value message 'tx)))
                (let ((uidata '()))
                  (with-slots (bty::tx-in-count bty::tx-out-count bty::tx-out) (slot-value message 'tx)
                    (let ((tx-total-value (/ (loop for txo in tx-out
@@ -133,6 +136,7 @@
               (t (format t "~&got a new message: ~s~%" command)))))))
 
 (defun start-peer (remote)
+  (btcl-db:start)
   (as:with-event-loop (:catch-app-errors nil)
     (as:signal-handler as:+sigint+
                      (lambda (sig)

@@ -114,9 +114,16 @@
            #:build-ip-addr
            #:hash))
 
+(defpackage #:btcl-db
+  (:use #:cl #:postmodern #:btcl-types)
+  (:export #:start
+           #:end
+           #:init-db
+           #:save))
+
 (defpackage #:btcl-wire
   (:nicknames #:btw)
-  (:use #:cl #:btcl #:btcl-digest #:btcl-util #:btcl-types)
+  (:use #:cl #:btcl #:btcl-digest #:btcl-util #:btcl-types #:btcl-db)
   (:export #:peer-connection
            #:start-peer
            #:msg-version
