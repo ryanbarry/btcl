@@ -220,18 +220,6 @@
    (tx-count varint)
    (tx-list (tx-list :count tx-count))))
 
-(defgeneric hash (obj))
-
-(defmethod hash ((obj tx))
-  (let ((octstream (ironclad:make-octet-output-stream)))
-    (bindata:write-value 'tx octstream obj)
-    (btcl-digest:dsha256 (ironclad:get-output-stream-octets octstream))))
-
-(defmethod hash ((obj blk))
-  (let ((octstream (ironclad:make-octet-output-stream)))
-    (bindata:write-value 'blk octstream obj)
-    (btcl-digest:dsha256 (ironclad:get-output-stream-octets octstream))))
-
 ;;; helpers
 
 (defgeneric build-ip-addr (addr)

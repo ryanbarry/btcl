@@ -83,7 +83,7 @@
 (defgeneric save (obj))
 
 (defmethod save ((obj bty:tx))
-  (let ((tx-hash (ironclad:byte-array-to-hex-string (bty:hash obj))))
+  (let ((tx-hash (btcl-digest:strhash obj)))
     (format t "hash: ~s (~d)~%" tx-hash (length tx-hash))
     (with-slots (bty::version bty::tx-in bty::tx-out bty::lock-time) obj
       (pomo:with-transaction ()
