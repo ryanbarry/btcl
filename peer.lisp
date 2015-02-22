@@ -65,7 +65,7 @@
              (if msg
                  (handle-message remote msg)
                  (setf got-a-msg nil))
-             (setf read-buffers buf-list))
+             (setf read-buffers (reverse buf-list)))
         while (and got-a-msg
                    (>= (sum-list-sequence-lengths read-buffers)
                        btcl-constants:+P2P-MSG-HEADER-LEN+))))))
