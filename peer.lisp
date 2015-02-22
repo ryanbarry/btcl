@@ -58,20 +58,17 @@
   (lambda (socket bytevec)
     (declare (ignore socket))
     (accumulate-input remote bytevec)
-    (loop with data-to-read = t
-       while data-to-read
-       do (multiple-value-bind (msg buf-list)
-              (try-read-message (reverse (slot-value remote 'read-buffers)))
-            (if msg
-                (progn
-                  (handle-message remote msg)
-                  ;; break loop at this point if less than a header's worth of
-                  ;; data in the buffer after reading the first message
-                  (if (< (sum-list-sequence-lengths buf-list)
-                         btcl-constants:+P2P-MSG-HEADER-LEN+)
-                      (setf data-to-read nil)))
-                (setf data-to-read nil))
-            (setf (slot-value remote 'read-buffers) buf-list)))))
+    (with-slots (read-buffers) remote
+     (loop with got-a-msg = t
+        do (multiple-value-bind (msg buf-list)
+               (try-read-message (reverse read-buffers))
+             (if msg
+                 (handle-message remote msg)
+                 (setf got-a-msg nil))
+             (setf read-buffers buf-list))
+        while (and got-a-msg
+                   (>= (sum-list-sequence-lengths read-buffers)
+                       btcl-constants:+P2P-MSG-HEADER-LEN+))))))
 
 (defun handle-message (remote message)
   (with-slots (command checksum) (slot-value message 'header)
