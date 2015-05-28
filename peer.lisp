@@ -36,7 +36,8 @@
   (let ((s (ironclad:make-octet-output-stream)))
     (handler-case (loop for b = (read-byte stream nil 'eof)
                      until (eql b 'eof)
-                     do (write-byte b s)))))
+                     do (write-byte b s)))
+    (ironclad:get-output-stream-octets s)))
 
 ;; in: list of byte vectors
 ;; out: (message or nil) and (list of byte vectors for remaining input)
