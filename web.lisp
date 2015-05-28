@@ -119,7 +119,7 @@
                                    (setf (@ elem inner-h-t-m-l)
                                          (+ (@ elem inner-h-t-m-l) "<p>" msg "</p>"))))
                                (defun addtx (txdata)
-                                 (let ((row (+ "<tr><td> ..." (chain (@ txdata hash) (substring 55))
+                                 (let ((row (+ "<tr><td> ..." (chain (@ txdata hash) (substring 56))
                                                "</td><td style=\"text-align:center;\">" (@ txdata "tx-in-count")
                                                " : " (@ txdata "tx-out-count")
                                                "</td><td style=\"text-align:right;\">" (@ txdata "total-sent") "</td></tr>")))
