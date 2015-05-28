@@ -42,7 +42,7 @@
 ;; in: list of byte vectors
 ;; out: (message or nil) and (list of byte vectors for remaining input)
 (defun try-read-message (buffers)
-  "given a list of octet vectors as a a read buffer, try to read a message"
+  "given a list of octet vectors as a read buffer, try to read a message"
   (if (>= (sum-list-sequence-lengths buffers)
           btcl-constants:+P2P-MSG-HEADER-LEN+)
       (let* ((instream (make-octet-input-stream buffers))
@@ -110,28 +110,11 @@
                                                               :cnt (length interesting-inventory)
                                                               :inv-vectors interesting-inventory)))))))
               ((string= command "tx")
-               (format t "~&got a tx!")
-               (let ((uidata '()))
-                 (with-slots (bty::tx-in-count bty::tx-out-count bty::tx-out) (slot-value message 'tx)
-                   (let ((tx-total-value (/ (loop for txo in tx-out
-                                               sum (slot-value txo 'bty::value)) 100000000)))
-                     (setf uidata (acons "type" "tx" uidata))
-                     (setf uidata (acons "hash" (format nil "~a" (ironclad:byte-array-to-hex-string (reverse msg-hash))) uidata))
-                     (setf uidata (acons "tx-in-count" bty::tx-in-count uidata))
-                     (setf uidata (acons "tx-out-count" bty::tx-out-count uidata))
-                     (setf uidata (acons "total-sent" (format nil "~8,1,,$" tx-total-value) uidata)))
-                   (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata)))))
+               (format t "~&got a tx! ")
+               (btcl-web:notify-tx (slot-value message 'tx) msg-hash))
               ((string= command "block")
                (format t "~&got a block!~%")
-               (let ((uidata '()))
-                 (with-slots (bty::tx-count bty::timestamp bty::bits) (slot-value message 'blk)
-                   (setf uidata (acons "type" "block" uidata))
-                   (setf uidata (acons "numtx" bty::tx-count uidata))
-                   (setf uidata (acons "timestamp" bty::timestamp uidata))
-                   (setf uidata (acons "diff" (/ #xFFFF0000000000000000000000000000000000000000000000000000
-                                                 (* (ldb (byte 24 0) bty::bits) (expt 2 (* 8 (- (ldb (byte 8 24) bty::bits) 3))))) uidata)))
-                 (btcl-web:publish! (cl-json:encode-json-alist-to-string uidata))))
-              (t (format t "~&got a new message: ~s~%" command)))))))
+               (btcl-web:notify-blk (slot-value message 'blk)))
 
 (defun start-peer (remote)
   (as:with-event-loop (:catch-app-errors nil)

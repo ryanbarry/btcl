@@ -66,7 +66,9 @@
   (:use :cl :cl-ppcre :cl-async :cl-who :parenscript)
   (:import-from :babel #:octets-to-string)
   (:export #:start-server
-           #:publish!))
+           #:publish!
+           #:notify-tx
+           #:notify-blk))
 
 (defpackage #:btcl-constants
   (:nicknames #:btconst)
