@@ -84,7 +84,7 @@
 
 (defmethod save ((obj bty:tx))
   (let ((tx-hash (btcl-digest:strhash obj)))
-    (format t "hash: ~s (~d)~%" tx-hash (length tx-hash))
+    ;; (format t "hash: ~s (~d)~%" tx-hash (length tx-hash))
     (with-slots (bty::version bty::tx-in bty::tx-out bty::lock-time) obj
       (pomo:with-transaction ()
        (list (pomo:save-dao (make-instance 'db-transaction
