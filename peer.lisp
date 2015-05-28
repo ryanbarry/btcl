@@ -1,5 +1,8 @@
 (in-package :btcl-wire)
 
+;;; TODO: all commented out (format)s need to be wrapped in a shim that allows
+;;; them to be easily enabled/disabled
+
 (defparameter *debug* t)
 
 (defun event-cb (ev)
@@ -43,17 +46,34 @@
 ;; out: (message or nil) and (list of byte vectors for remaining input)
 (defun try-read-message (buffers)
   "given a list of octet vectors as a read buffer, try to read a message"
+  ;; (format t "~&trying to read a message (buffer has ~d bytes)"
+  ;;         (sum-list-sequence-lengths buffers))
   (if (>= (sum-list-sequence-lengths buffers)
           btcl-constants:+P2P-MSG-HEADER-LEN+)
       (let* ((instream (make-octet-input-stream buffers))
              (header (bindata:read-value 'p2p-msg-header instream)))
         (if (>= (sum-list-sequence-lengths buffers) (+ (slot-value header 'len)
                                                        btcl-constants:+P2P-MSG-HEADER-LEN+))
-            (let* ((instream (make-octet-input-stream buffers)))
-              (values (bindata:read-value 'p2p-msg instream)
-                      (list (octet-input-stream-to-vector instream))))
-            (values nil buffers)))
-      (values nil buffers)))
+            (let* ((instream (make-octet-input-stream buffers))
+                   (msg (bindata:read-value 'p2p-msg instream))
+                   (leftovers (list (octet-input-stream-to-vector instream)))
+                   ;; (leftovers-len (sum-list-sequence-lengths leftovers))
+                   )
+              ;; (format t "~&got a msg, ~d bytes left in buffer after reading" leftovers-len)
+              ;; (if (> leftovers-len 0)
+              ;;     (format t ", contents:~%~a" leftovers))
+              (values msg leftovers))
+            (progn
+              ;; (format t "~%buffers only contain partial message (header-specified len: ~d, buffer len: ~d)"
+              ;;         (slot-value header 'len) (sum-list-sequence-lengths buffers))
+              ;; (if (> (slot-value header 'len) 33554432) ; constant from bitcoind's serialize.h
+              ;;     (progn
+              ;;       (format t "this message is greater than MAX_SIZE!~%~a" buffers)
+              ;;       (-1)))
+              (values nil buffers))))
+      (progn
+        ;; (format t "~%didn't get enough bytes for a header~%~%")
+        (values nil buffers))))
 
 (defun make-read-cb (remote)
   (lambda (socket bytevec)
@@ -82,7 +102,8 @@
           (progn
             (format t "~&checksum received: ~X~%checksum computed: ~X~%" checksum computed-cksm)
             (signal 'invalid-msg :bad-checksum))
-          (format t "checksum checks out!"))
+          ;(format t "checksum checks out!")
+          )
       (with-slots (handshaken) remote
         (cond ((string= command "verack")
                (format t "~&got a verack!")
@@ -95,15 +116,15 @@
                (send-msg remote (prep-msg (make-instance 'msg-verack)))
                (format t "~&handshaken: ~d~%" handshaken))
               ((string= command "inv")
-               (format t "~&got some inventory!")
+               (format t "~&got an inv notification!")
                (with-slots (magic command len checksum cnt inv-vectors) (slot-value message 'header)
                  (with-slots (cnt inv-vectors) message
-                  (format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
+                  ;(format t "~&magic: ~X~%command: ~s~%len: ~d~%checksum: ~X" magic command len checksum)
                   (let ((interesting-inventory (loop for inv in inv-vectors
                                                   for objtype = (slot-value inv 'bty::obj-type)
                                                   for hsh = (slot-value inv 'bty::hash)
-                                                  do (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
-                                                             cnt objtype hsh)
+                                                  ;; do (format t "~&~tcount: ~d~%~tobj_type: ~d~%~thash: ~X~%"
+                                                  ;;            cnt objtype hsh)
                                                   when (or (= objtype 1) (= objtype 2))
                                                   collect inv)))
                     (send-msg remote (prep-msg (make-instance 'msg-getdata
@@ -111,10 +132,13 @@
                                                               :inv-vectors interesting-inventory)))))))
               ((string= command "tx")
                (format t "~&got a tx! ")
+               ;; (with-slots (bty::version bty::lock-time) (slot-value message 'tx)
+               ;;  (format t "version: ~a~%nLockTime: ~a~%" bty::version bty::lock-time))
                (btcl-web:notify-tx (slot-value message 'tx) msg-hash))
               ((string= command "block")
                (format t "~&got a block!~%")
                (btcl-web:notify-blk (slot-value message 'blk)))
+              (t (format t "~&received message of unknown type: ~s~%" command)))))))
 
 (defun start-peer (remote)
   (as:with-event-loop (:catch-app-errors nil)
