@@ -19,4 +19,6 @@
                (:file "digest")
                (:file "db")
                (:file "wire")
-               (:file "peer")))
+               (:file "peer")
+               (:file "block")
+               (:file "rules")))

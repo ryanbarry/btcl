@@ -138,3 +138,12 @@
            #:msg-block
            #:msg-addr))
 
+(defpackage #:btcl-core
+  (:nicknames #:bto)
+  (:export #:blok-header
+           #:blok))
+
+(defpackage #:btcl-rules
+  (:nicknames #:btr)
+  (:use #:cl #:btcl #:btcl-core)
+  (:export #:check-block-header))
