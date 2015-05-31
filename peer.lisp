@@ -79,20 +79,17 @@
   (lambda (socket bytevec)
     (declare (ignore socket))
     (accumulate-input remote bytevec)
-    (loop with data-to-read = t
-       while data-to-read
-       do (multiple-value-bind (msg buf-list)
-              (try-read-message (reverse (slot-value remote 'read-buffers)))
-            (if msg
-                (progn
-                  (handle-message remote msg)
-                  ;; break loop at this point if less than a header's worth of
-                  ;; data in the buffer after reading the first message
-                  (if (< (sum-list-sequence-lengths buf-list)
-                         btcl-constants:+P2P-MSG-HEADER-LEN+)
-                      (setf data-to-read nil)))
-                (setf data-to-read nil))
-            (setf (slot-value remote 'read-buffers) buf-list)))))
+    (with-slots (read-buffers) remote
+     (loop with got-a-msg = t
+        do (multiple-value-bind (msg buf-list)
+               (try-read-message (reverse read-buffers))
+             (if msg
+                 (handle-message remote msg)
+                 (setf got-a-msg nil))
+             (setf read-buffers (reverse buf-list)))
+        while (and got-a-msg
+                   (>= (sum-list-sequence-lengths read-buffers)
+                       btcl-constants:+P2P-MSG-HEADER-LEN+))))))
 
 (defun handle-message (remote message)
   (with-slots (command checksum) (slot-value message 'header)
@@ -134,6 +131,19 @@
                (format t "~&got a tx! ")
                ;; (with-slots (bty::version bty::lock-time) (slot-value message 'tx)
                ;;  (format t "version: ~a~%nLockTime: ~a~%" bty::version bty::lock-time))
+               (format t "saving...")
+               (let* ((res (btcl-db:save (slot-value message 'tx)))
+                      ; from http://rosettacode.org/wiki/Flatten_a_list#Common_Lisp
+                      (flat-res (do* ((result (list res))
+                                      (node result))
+                                     ((null node) (delete nil result))
+                                  (cond ((consp (car node))
+                                         (when (cdar node) (push (cdar node) (cdr node)))
+                                         (setf (car node) (caar node)))
+                                        (t (setf node (cdr node)))))))
+                 (if (every #'identity flat-res)
+                     (format t "success!")
+                     (format t "failed!")))
                (btcl-web:notify-tx (slot-value message 'tx) msg-hash))
               ((string= command "block")
                (format t "~&got a block!~%")
@@ -141,6 +151,7 @@
               (t (format t "~&received message of unknown type: ~s~%" command)))))))
 
 (defun start-peer (remote)
+  (btcl-db:start)
   (as:with-event-loop (:catch-app-errors nil)
     (as:signal-handler as:+sigint+
                      (lambda (sig)

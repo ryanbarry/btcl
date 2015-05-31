@@ -79,9 +79,6 @@
            #:+MAINNET-MAGIC+
            #:+MAINNET-GENESIS-BLOCK+))
 
-(defpackage #:btcl-digest
-  (:use #:cl #:btcl)
-  (:export #:dsha256-checksum))
 
 (defpackage #:btcl-types
   (:nicknames #:bty)
@@ -114,9 +111,23 @@
            #:blk
            #:build-ip-addr))
 
+(defpackage #:btcl-digest
+  (:use #:cl)
+  (:export #:dsha256-checksum
+           #:dsha256
+           #:hash
+           #:strhash))
+
+(defpackage #:btcl-db
+  (:use #:cl #:postmodern #:btcl-types)
+  (:export #:start
+           #:end
+           #:init-db
+           #:save))
+
 (defpackage #:btcl-wire
   (:nicknames #:btw)
-  (:use #:cl #:btcl #:btcl-digest #:btcl-util #:btcl-types)
+  (:use #:cl #:btcl #:btcl-digest #:btcl-util #:btcl-types #:btcl-db)
   (:export #:peer-connection
            #:start-peer
            #:msg-version
