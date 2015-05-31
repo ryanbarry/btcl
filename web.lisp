@@ -62,7 +62,29 @@
             (declare (ignore e))
             (format t "Removing inactive socket...")
             (setf *channel* (remove sock *channel*))))))
- 
+
+(defun notify-tx (tx msg-hash)
+  (let ((uidata '()))
+    (with-slots (bty::tx-in-count bty::tx-out-count bty::tx-out) tx
+      (let ((tx-total-value (/ (loop for txo in bty::tx-out
+                                  sum (slot-value txo 'bty::value)) 100000000)))
+        (setf uidata (acons "type" "tx" uidata))
+        (setf uidata (acons "hash" (format nil "~a" (ironclad:byte-array-to-hex-string (reverse msg-hash))) uidata))
+        (setf uidata (acons "tx-in-count" bty::tx-in-count uidata))
+        (setf uidata (acons "tx-out-count" bty::tx-out-count uidata))
+        (setf uidata (acons "total-sent" (format nil "~8,1,,$" tx-total-value) uidata)))
+      (publish! (cl-json:encode-json-alist-to-string uidata)))))
+
+(defun notify-blk (blk)
+  (let ((uidata '()))
+    (with-slots (bty::tx-count bty::timestamp bty::bits) blk
+      (setf uidata (acons "type" "block" uidata))
+      (setf uidata (acons "numtx" bty::tx-count uidata))
+      (setf uidata (acons "timestamp" bty::timestamp uidata))
+      (setf uidata (acons "diff" (/ #xFFFF0000000000000000000000000000000000000000000000000000
+                                    (* (ldb (byte 24 0) bty::bits) (expt 2 (* 8 (- (ldb (byte 8 24) bty::bits) 3))))) uidata)))
+    (publish! (cl-json:encode-json-alist-to-string uidata))))
+
 (defun write/keep-alive (sock data)
   (unless (as:socket-closed sock)
     (as:write-socket-data sock (cat (format nil "~X" (length data)) crlf data crlf))))
@@ -119,7 +141,7 @@
                                    (setf (@ elem inner-h-t-m-l)
                                          (+ (@ elem inner-h-t-m-l) "<p>" msg "</p>"))))
                                (defun addtx (txdata)
-                                 (let ((row (+ "<tr><td> ..." (chain (@ txdata hash) (substring 55))
+                                 (let ((row (+ "<tr><td> ..." (chain (@ txdata hash) (substring 56))
                                                "</td><td style=\"text-align:center;\">" (@ txdata "tx-in-count")
                                                " : " (@ txdata "tx-out-count")
                                                "</td><td style=\"text-align:right;\">" (@ txdata "total-sent") "</td></tr>")))
